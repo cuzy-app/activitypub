@@ -1,0 +1,10 @@
+{
+    "id": "fediverse",
+    "name": "Fediverse",
+    "description": "Connects this HumHub to the Fediverse (ActivityPub) — Mastodon-compatible federation.",
+    "keywords": ["fediverse", "activitypub", "mastodon"],
+    "version": "0.1.0",
+    "humhub": {
+        "minVersion": "1.17"
+    }
+}

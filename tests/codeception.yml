@@ -1,0 +1,12 @@
+actor: Tester
+namespace: fediverse
+bootstrap: _bootstrap.php
+settings:
+    colors: true
+    memory_limit: 1024M
+paths:
+    tests: codeception
+    output: codeception/_output
+    data: codeception/_data
+    helpers: codeception/_support
+    envs: ../../../../core/develop/protected/humhub/tests/config/env

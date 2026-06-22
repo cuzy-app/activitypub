@@ -947,3 +947,16 @@ Next: **Plan 3 — Inbound core** (inbox controller, HTTP-signature verification
 - Spec coverage: actor model §4 (Person + instance Application), WebFinger/identity §11, NodeInfo (§8 endpoints) — covered. Avatar/summary deferred to the spec's Phase-2 hardening, called out explicitly.
 - Open risk to confirm during implementation: that a module `urlManagerRules` pattern for `.well-known/webfinger` is matched ahead of core's `WellKnownUrlRule` (the calendar module's `/.well-known/caldav` is the working precedent). If a collision appears, fall back to a custom `UrlRuleInterface` class registered via `['class' => …]`. The live check in Task 6 will reveal this immediately.
 - `Controller::$access = null` + `enableSession = false` is used to keep these endpoints public; confirm against HumHub's base `humhub\components\Controller` access behaviour during the first live check (Task 5), since federation endpoints must answer for anonymous/remote callers.
+
+## Post-review corrections (applied to shipped code)
+
+The two-stage review and live verification on `humhub-develop.localhost` produced these deltas to the code above (commits `f0d99cc`, `b7b4b00`):
+
+- **All three read controllers set `public $access = null;`.** The original Task 5–7 code only set it on `ActorController`; without it `WebfingerController`/`NodeinfoController` 401 for anonymous remote callers. Fixed.
+- **`NodeinfoController` JSON helper renamed `asJson` → `respondJson`.** `asJson` collided with the inherited PUBLIC `yii\web\Controller::asJson()` — overriding it `private` is a PHP fatal (HTTP 500). `php -l` cannot catch this (inheritance error, not syntax); the live check did.
+- **`WebfingerController` hardening:** explicit `@`-presence check → `BadRequestHttpException` (400, RFC 7033) for malformed `acct:`; the instance (`TYPE_APPLICATION`) actor is now resolvable by WebFinger; response building extracted into a private `jrd()` helper.
+- **`KeyManager` hardening:** `generateKeypair()` now checks `openssl_pkey_export()`/`openssl_pkey_get_details()` return values (no silently-empty key); `getOrCreateForUser()` catches `yii\db\IntegrityException` on a concurrent-provisioning race and re-fetches.
+
+**Deferred hardening (not done here):** lazy keypair generation on unauthenticated GET has no rate limit. Low risk (HumHub GUIDs are random/unguessable; this is a test install) — tracked for a later hardening pass, not Plan 3.
+
+**Verified live:** instance actor (200), NodeInfo discovery + 2.1 (200), WebFinger malformed (400) and non-guest-visible (404), and the full happy path — a guest-visible user resolves via WebFinger to a Mastodon-shaped `Person` doc with a well-formed `publicKeyPem`. Cross-instance interop against a real Mastodon awaits the public `fedihub.social` deployment (`.localhost` is not internet-resolvable).

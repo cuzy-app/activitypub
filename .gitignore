@@ -1,2 +1,5 @@
 # Brainstorming visual-companion scratch files
 .superpowers/
+
+# Playwright MCP output
+.playwright-mcp/

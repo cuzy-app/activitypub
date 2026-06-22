@@ -72,14 +72,17 @@ class ProcessInboxActivity extends ActiveJob
 
         // Body must be authenticated: digest required in the signed set and matching.
         if (!in_array('digest', $headerList, true)) {
+            Yii::warning('Fediverse inbox: digest not in signed headers [' . $parsed['headers'] . ']', 'fediverse');
             return null;
         }
         if (!hash_equals(SignatureService::digest($this->rawBody), (string) ($this->headers['digest'] ?? ''))) {
+            Yii::warning('Fediverse inbox: digest mismatch (got ' . (string) ($this->headers['digest'] ?? '') . ')', 'fediverse');
             return null;
         }
 
         // Reject stale/future-dated requests (basic replay window).
         if (!$this->isFreshDate((string) ($this->headers['date'] ?? ''))) {
+            Yii::warning('Fediverse inbox: stale/invalid date (' . (string) ($this->headers['date'] ?? '') . ')', 'fediverse');
             return null;
         }
 
@@ -98,13 +101,11 @@ class ProcessInboxActivity extends ActiveJob
         }
 
         $svc = new SignatureService();
-        $signingString = $svc->buildSigningString('POST', $this->requestPath, [
-            'host' => (string) ($this->headers['host'] ?? ''),
-            'date' => (string) ($this->headers['date'] ?? ''),
-            'digest' => (string) ($this->headers['digest'] ?? ''),
-            'content-type' => (string) ($this->headers['content-type'] ?? ''),
-        ], $headerList);
+        // Reconstruct from ALL received headers so any signed header resolves.
+        $signingString = $svc->buildSigningString('POST', $this->requestPath, $this->headers, $headerList);
         if (!$svc->verifyString($signingString, $parsed['signature'], $pem)) {
+            Yii::warning('Fediverse inbox: signature verify failed (actor ' . $actorUrl
+                . ', signed headers [' . $parsed['headers'] . '])', 'fediverse');
             return null;
         }
 
@@ -207,9 +208,14 @@ class ProcessInboxActivity extends ActiveJob
             ],
         ];
 
-        $inbox = $remote->shared_inbox_url ?: $remote->inbox_url;
+        // Deliver the Accept to the follower's PERSONAL inbox — a directed
+        // activity. The shared inbox is for broadcast and silently drops an
+        // unaddressed directed Accept (it returns 202 but never routes it).
+        $inbox = $remote->inbox_url ?: $remote->shared_inbox_url;
         try {
-            (new ActivityDelivery())->deliver($signer, $inbox, $accept);
+            if (!(new ActivityDelivery())->deliver($signer, $inbox, $accept)) {
+                Yii::warning('Fediverse Accept delivery returned non-2xx for ' . $inbox, 'fediverse');
+            }
         } catch (\Throwable $e) {
             Yii::warning('Fediverse Accept delivery failed: ' . $e->getMessage(), 'fediverse');
         }

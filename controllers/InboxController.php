@@ -45,14 +45,19 @@ class InboxController extends Controller
             throw new BadRequestHttpException('Missing body or signature');
         }
 
-        // Capture only the headers the verifier needs; respond fast, do work in the job.
-        $headers = [
-            'signature' => $signature,
-            'date' => (string) Yii::$app->request->headers->get('date'),
-            'digest' => (string) Yii::$app->request->headers->get('digest'),
-            'host' => (string) Yii::$app->request->headers->get('host'),
-            'content-type' => (string) Yii::$app->request->headers->get('content-type'),
-        ];
+        // Capture ALL request headers (lowercased) so the verifier can reconstruct
+        // the signing string for whatever set the remote signed. Respond fast,
+        // do the work in the job.
+        $headers = [];
+        foreach (Yii::$app->request->headers->toArray() as $name => $values) {
+            $headers[strtolower($name)] = is_array($values) ? (string) end($values) : (string) $values;
+        }
+        // Yii's header collection does not expose the Host header under some SAPIs
+        // (e.g. FrankenPHP), but remotes sign `host`. Take it from the server var,
+        // which holds exactly the value the remote sent (and signed).
+        if (empty($headers['host']) && !empty($_SERVER['HTTP_HOST'])) {
+            $headers['host'] = (string) $_SERVER['HTTP_HOST'];
+        }
 
         Yii::$app->queue->push(new ProcessInboxActivity([
             'rawBody' => $rawBody,

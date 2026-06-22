@@ -114,7 +114,9 @@ class RemoteActorResolver
 
         $profile = $user->profile;
         $profile->firstname = mb_substr($name, 0, 255);
-        $profile->lastname = '';
+        // HumHub requires a last name by default; remote actors only have a
+        // display name + handle, so use the domain as a non-empty last name.
+        $profile->lastname = mb_substr($domain, 0, 255);
         if (!$profile->save()) {
             Yii::warning('Federated user profile save failed: ' . implode(', ', $profile->getErrorSummary(true)), 'fediverse');
         }

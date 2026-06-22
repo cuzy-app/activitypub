@@ -15,6 +15,8 @@ return [
         ['pattern' => '.well-known/nodeinfo', 'route' => 'fediverse/nodeinfo/index'],
         ['pattern' => 'nodeinfo/2.1', 'route' => 'fediverse/nodeinfo/schema'],
         ['pattern' => 'fediverse/instance-actor', 'route' => 'fediverse/actor/instance'],
+        ['pattern' => 'fediverse/inbox', 'route' => 'fediverse/inbox/shared', 'verb' => ['POST']],
+        ['pattern' => 'fediverse/actor/<guid:[\w\-]+>/inbox', 'route' => 'fediverse/inbox/user', 'verb' => ['POST']],
         ['pattern' => 'fediverse/actor/<guid:[\w\-]+>', 'route' => 'fediverse/actor/index'],
     ],
 ];

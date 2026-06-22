@@ -46,6 +46,7 @@ class FederationObject extends ActiveRecord
             [['model_id'], 'integer'],
             [['raw_json'], 'string'],
             [['direction'], 'string', 'max' => 16],
+            [['direction'], 'in', 'range' => [self::DIRECTION_LOCAL, self::DIRECTION_REMOTE]],
             [['object_type'], 'string', 'max' => 32],
             [['ap_id', 'model_class', 'in_reply_to_ap_id'], 'string', 'max' => 255],
             [['ap_id'], 'unique'],

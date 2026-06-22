@@ -1,10 +1,10 @@
 <?php
 
-use humhub\libs\Html;
-use humhub\widgets\Button;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\form\ActiveForm;
 use humhub\modules\fediverse\models\ConfigureForm;
-use yii\bootstrap\ActiveForm;
 
+/* @var $this \humhub\components\View */
 /* @var $model ConfigureForm */
 ?>
 <div class="panel panel-default">

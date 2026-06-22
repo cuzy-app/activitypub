@@ -914,4 +914,18 @@ HTTP Signature verification reconstructs the signed string from the request's `h
 
 If signatures fail in the first peer test, check these two before anything else. (This is why the round-trip unit test passes but a real peer can still fail — the unit test controls both sides.)
 
+## Post-review corrections (applied to shipped code)
+
+The two-stage review found several real security issues; these deltas were applied (commit `06c9a7e`) on top of the task code above:
+
+- **Verify-before-persist (was: persist-before-verify).** `ProcessInboxActivity` now `authenticate()`s first and only calls `resolveFromDocument()` (which creates the shadow `User`/`RemoteActor`) *after* the signature verifies. Previously an unauthenticated POST could create ghost users.
+- **Key from `keyId`, with actor binding.** The public key is fetched from the `Signature` header's `keyId` URL (not the body), and the signer's `id` must equal the activity `actor` — else reject. (Previously `keyId` was parsed but unused.)
+- **`digest` is mandatory** in the signed header set (reject if absent) so the body is always authenticated; plus a **Date-freshness window** (≤1 h old, ≤5 min future) for basic replay resistance.
+- **`FederationHttpClient`** (new) — `humhub\libs\HttpClient::beforeSend()` *replaces* request options with `CURLHelper` defaults, silently dropping per-request timeouts. The subclass re-applies hardening **after** `parent::beforeSend()`: `CURLOPT_FOLLOWLOCATION => false` (closes SSRF-via-redirect), HTTPS-only, and enforced timeouts. Both `RemoteActorResolver` and `ActivityDelivery` use it.
+- **Shadow-user email.** HumHub `user.emailRequired` defaults to `true`, so the shadow `User` now gets a deterministic synthetic address `remote-<sha1(actorUrl)>@federated.invalid` (the `.invalid` TLD never routes). Without this, every inbound activity failed on save. Plus: `profile->save()` return is checked/logged, and a concurrent-creation race is caught (`IntegrityException`).
+
+**Deferred hardening (documented, not done):** DNS-rebinding (check-then-connect TOCTOU) — mitigated in practice by disabled redirects + the host pre-check, and the fetched body is never reflected to the caller (blind SSRF). Full pinning via `CURLOPT_RESOLVE` is a later item.
+
+**Verified live:** `POST /fediverse/inbox` without a signature returns **400** on the public `https://test.fedihub.social` (route active, CSRF disabled, public access, rejection path correct). The full inbound `Follow` → `Accept` handshake awaits a real peer follow (now possible against the public instance — see the next session's interop test).
+
 Next: **Plan 4 — Outbound** (per-container opt-in + §5 invariant, `Create{Note}`/`Update`/`Delete`/`Like` serializers, queued delivery to followers, outbox).

@@ -2,31 +2,30 @@
 
 namespace humhub\modules\fediverse\controllers;
 
-use humhub\modules\content\components\ContentContainerController;
-use humhub\modules\user\models\User;
+use humhub\components\Controller;
 use Yii;
 
-class ProfileConfigController extends ContentContainerController
+/**
+ * Lets the logged-in user opt their own profile in/out of federation.
+ */
+class ProfileConfigController extends Controller
 {
-    /** Only the profile owner (or an admin) may toggle federation. */
     public function actionIndex()
     {
-        $container = $this->contentContainer; // set by ContentContainerController
-        if (!$container instanceof User || (!$container->isCurrentUser() && !Yii::$app->user->isAdmin())) {
-            throw new \yii\web\ForbiddenHttpException();
+        $user = Yii::$app->user->getIdentity();
+        if ($user === null) {
+            return $this->redirect(['/user/auth/login']);
         }
 
-        $settings = Yii::$app->getModule('fediverse')->settings->contentContainer($container);
+        $settings = Yii::$app->getModule('fediverse')->settings->contentContainer($user);
 
         if (Yii::$app->request->isPost) {
-            $enabled = (bool) Yii::$app->request->post('federationEnabled', false);
-            $settings->set('federationEnabled', $enabled ? 1 : 0);
+            $settings->set('federationEnabled', Yii::$app->request->post('federationEnabled') ? 1 : 0);
             $this->view->saved();
-            return $this->redirect($container->createUrl('/fediverse/profile-config/index'));
+            return $this->redirect(['index']);
         }
 
         return $this->render('index', [
-            'container' => $container,
             'enabled' => (bool) $settings->get('federationEnabled', false),
         ]);
     }

@@ -2,28 +2,37 @@
 
 namespace humhub\modules\fediverse\services;
 
-use humhub\libs\HttpClient;
 use humhub\modules\fediverse\models\RemoteActor;
-use humhub\modules\user\models\Profile;
 use humhub\modules\user\models\User;
 use RuntimeException;
 use Yii;
+use yii\db\IntegrityException;
 
 /**
  * Resolves a remote ActivityPub actor URL into a cached RemoteActor row backed
  * by a local "federated" shadow User (login disabled, hidden from directory).
+ * Persistence happens only via resolveFromDocument(), which callers invoke
+ * AFTER signature verification.
  */
 class RemoteActorResolver
 {
-    /** Get the cached RemoteActor for an actor URL, or fetch + create it. */
+    /** Cached RemoteActor for an actor URL, or fetch + persist it. */
     public function resolve(string $actorUrl): RemoteActor
     {
         $existing = RemoteActor::findOne(['ap_id' => $actorUrl]);
         if ($existing !== null) {
             return $existing;
         }
+        return $this->resolveFromDocument($actorUrl, $this->fetchActorDocument($actorUrl));
+    }
 
-        $doc = $this->fetchActorDocument($actorUrl);
+    /** Persist (or return cached) a RemoteActor from an already-fetched, verified actor document. */
+    public function resolveFromDocument(string $actorUrl, array $doc): RemoteActor
+    {
+        $existing = RemoteActor::findOne(['ap_id' => $actorUrl]);
+        if ($existing !== null) {
+            return $existing;
+        }
 
         $user = $this->createShadowUser($doc, $actorUrl);
 
@@ -50,19 +59,18 @@ class RemoteActorResolver
         return $remote;
     }
 
-    /** Fetch and JSON-decode an actor document (SSRF-guarded). */
+    /** Fetch and JSON-decode an actor document (SSRF-guarded, no redirects, no persistence). */
     public function fetchActorDocument(string $actorUrl): array
     {
         if (!UrlSafety::isSafePublicUrl($actorUrl)) {
             throw new RuntimeException('Refusing to fetch unsafe URL: ' . $actorUrl);
         }
 
-        $client = new HttpClient();
+        $client = new FederationHttpClient();
         $response = $client->createRequest()
             ->setMethod('GET')
             ->setUrl($actorUrl)
             ->addHeaders(['Accept' => 'application/activity+json'])
-            ->setOptions([CURLOPT_TIMEOUT => 10, CURLOPT_CONNECTTIMEOUT => 5])
             ->send();
 
         if (!$response->getIsOk()) {
@@ -80,20 +88,36 @@ class RemoteActorResolver
     {
         $domain = (string) parse_url($actorUrl, PHP_URL_HOST);
         $preferred = isset($doc['preferredUsername']) ? (string) $doc['preferredUsername'] : 'user';
+        $name = trim((string) ($doc['name'] ?? '')) ?: $preferred;
 
         $user = new User();
         $user->username = $this->uniqueUsername($preferred . '@' . $domain);
+        $user->email = 'remote-' . substr(sha1($actorUrl), 0, 20) . '@federated.invalid';
         $user->status = User::STATUS_ENABLED;
-        $user->visibility = User::VISIBILITY_HIDDEN; // not listed in People directory
-        if (!$user->save()) {
-            throw new RuntimeException('Could not create shadow user: ' . implode(', ', $user->getErrorSummary(true)));
+        $user->visibility = User::VISIBILITY_HIDDEN; // excluded from People directory
+
+        try {
+            if (!$user->save()) {
+                throw new RuntimeException('Could not create shadow user: ' . implode(', ', $user->getErrorSummary(true)));
+            }
+        } catch (IntegrityException $e) {
+            // Concurrent creation for the same actor: reuse the existing shadow user if present.
+            $existingRemote = RemoteActor::findOne(['ap_id' => $actorUrl]);
+            if ($existingRemote !== null && $existingRemote->user_id !== null) {
+                $reused = User::findOne($existingRemote->user_id);
+                if ($reused !== null) {
+                    return $reused;
+                }
+            }
+            throw $e;
         }
 
-        $name = trim((string) ($doc['name'] ?? '')) ?: $preferred;
         $profile = $user->profile;
         $profile->firstname = mb_substr($name, 0, 255);
         $profile->lastname = '';
-        $profile->save();
+        if (!$profile->save()) {
+            Yii::warning('Federated user profile save failed: ' . implode(', ', $profile->getErrorSummary(true)), 'fediverse');
+        }
 
         $defaultGroup = Yii::$app->getModule('user')->getDefaultGroup();
         if ($defaultGroup !== null) {

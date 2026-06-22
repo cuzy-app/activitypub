@@ -2,7 +2,6 @@
 
 namespace humhub\modules\fediverse\services;
 
-use humhub\libs\HttpClient;
 use humhub\modules\fediverse\models\LocalActor;
 use RuntimeException;
 
@@ -19,12 +18,7 @@ class ActivityDelivery
         $this->signatures = $signatures ?? new SignatureService();
     }
 
-    /**
-     * @param LocalActor $signer the local actor whose key signs the request
-     * @param string $inboxUrl absolute remote inbox URL
-     * @param array $activity the activity to deliver (JSON-LD array)
-     * @return bool true on a 2xx response
-     */
+    /** @return bool true on a 2xx response */
     public function deliver(LocalActor $signer, string $inboxUrl, array $activity): bool
     {
         if (!UrlSafety::isSafePublicUrl($inboxUrl)) {
@@ -53,7 +47,7 @@ class ActivityDelivery
             $signatureB64
         );
 
-        $client = new HttpClient();
+        $client = new FederationHttpClient();
         $response = $client->createRequest()
             ->setMethod('POST')
             ->setUrl($inboxUrl)
@@ -65,7 +59,6 @@ class ActivityDelivery
                 'Signature' => $signatureHeader,
             ])
             ->setContent($body)
-            ->setOptions([CURLOPT_TIMEOUT => 10, CURLOPT_CONNECTTIMEOUT => 5])
             ->send();
 
         return $response->getIsOk();

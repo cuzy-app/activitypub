@@ -6,7 +6,6 @@ use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\models\RemoteActor;
 use humhub\modules\fediverse\services\ActivityDelivery;
-use humhub\modules\fediverse\services\FederationUrl;
 use humhub\modules\fediverse\services\RemoteActorResolver;
 use humhub\modules\fediverse\services\SignatureService;
 use humhub\modules\queue\ActiveJob;
@@ -14,8 +13,10 @@ use humhub\modules\user\models\User;
 use Yii;
 
 /**
- * Verifies an inbound activity's HTTP Signature, then dispatches by type.
- * Phase 3 handles Follow and Undo{Follow}; other types are logged and ignored.
+ * Authenticates an inbound activity's HTTP Signature (digest required, fresh
+ * date, key fetched from keyId, signer == activity actor) and ONLY THEN
+ * resolves/persists the remote actor and dispatches by type. Phase 3 handles
+ * Follow and Undo{Follow}; other types are logged and ignored.
  */
 class ProcessInboxActivity extends ActiveJob
 {
@@ -37,11 +38,10 @@ class ProcessInboxActivity extends ActiveJob
             return;
         }
 
-        $resolver = new RemoteActorResolver();
-        $remote = $resolver->resolve($actorUrl);
-
-        if (!$this->verifySignature($remote)) {
-            Yii::warning('Fediverse inbox: signature verification failed for ' . $actorUrl, 'fediverse');
+        // Authenticate BEFORE any persistence or trust.
+        $remote = $this->authenticate($actorUrl);
+        if ($remote === null) {
+            Yii::warning('Fediverse inbox: authentication failed for ' . $actorUrl, 'fediverse');
             return;
         }
 
@@ -57,19 +57,44 @@ class ProcessInboxActivity extends ActiveJob
         }
     }
 
-    private function verifySignature(RemoteActor $remote): bool
+    /**
+     * Verify the HTTP Signature and, on success, resolve+persist the actor.
+     * Returns null (caller drops the activity) on any verification failure.
+     */
+    private function authenticate(string $actorUrl): ?RemoteActor
     {
         $parsed = SignatureService::parseSignatureHeader($this->headers['signature'] ?? '');
-        if (empty($parsed['signature']) || empty($parsed['headers'])) {
-            return false;
+        if (empty($parsed['signature']) || empty($parsed['headers']) || empty($parsed['keyId'])) {
+            return null;
         }
 
-        // Verify the body Digest first (if it was part of the signed set).
         $headerList = explode(' ', $parsed['headers']);
-        if (in_array('digest', $headerList, true)) {
-            if (!hash_equals(SignatureService::digest($this->rawBody), (string) ($this->headers['digest'] ?? ''))) {
-                return false;
-            }
+
+        // Body must be authenticated: digest required in the signed set and matching.
+        if (!in_array('digest', $headerList, true)) {
+            return null;
+        }
+        if (!hash_equals(SignatureService::digest($this->rawBody), (string) ($this->headers['digest'] ?? ''))) {
+            return null;
+        }
+
+        // Reject stale/future-dated requests (basic replay window).
+        if (!$this->isFreshDate((string) ($this->headers['date'] ?? ''))) {
+            return null;
+        }
+
+        // Fetch the signer's key from keyId (NOT from the body); no persistence.
+        $signerUrl = preg_replace('/#.*$/', '', $parsed['keyId']);
+        $resolver = new RemoteActorResolver();
+        try {
+            $signerDoc = $resolver->fetchActorDocument($signerUrl);
+        } catch (\Throwable $e) {
+            Yii::warning('Fediverse inbox: signer fetch failed: ' . $e->getMessage(), 'fediverse');
+            return null;
+        }
+        $pem = $signerDoc['publicKey']['publicKeyPem'] ?? null;
+        if (!is_string($pem) || $pem === '') {
+            return null;
         }
 
         $svc = new SignatureService();
@@ -79,8 +104,31 @@ class ProcessInboxActivity extends ActiveJob
             'digest' => (string) ($this->headers['digest'] ?? ''),
             'content-type' => (string) ($this->headers['content-type'] ?? ''),
         ], $headerList);
+        if (!$svc->verifyString($signingString, $parsed['signature'], $pem)) {
+            return null;
+        }
 
-        return $svc->verifyString($signingString, $parsed['signature'], (string) $remote->public_key);
+        // Binding: the signer (keyId owner) must equal the activity actor.
+        $signerId = (string) ($signerDoc['id'] ?? $signerUrl);
+        if ($signerId !== $actorUrl) {
+            Yii::warning('Fediverse inbox: actor/keyId mismatch (' . $actorUrl . ' vs ' . $signerId . ')', 'fediverse');
+            return null;
+        }
+
+        return $resolver->resolveFromDocument($signerId, $signerDoc);
+    }
+
+    private function isFreshDate(string $date): bool
+    {
+        if ($date === '') {
+            return false;
+        }
+        $ts = strtotime($date);
+        if ($ts === false) {
+            return false;
+        }
+        $delta = time() - $ts;
+        return $delta <= 3600 && $delta >= -300; // up to 1h old, 5min future skew
     }
 
     private function handleFollow(array $activity, RemoteActor $remote): void
@@ -126,7 +174,6 @@ class ProcessInboxActivity extends ActiveJob
         ]);
     }
 
-    /** Resolve a Follow `object` (our actor URL) to the local User. */
     private function resolveFollowTarget($object): ?User
     {
         $url = is_array($object) ? ($object['id'] ?? '') : (string) $object;

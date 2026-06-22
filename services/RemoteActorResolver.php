@@ -94,7 +94,7 @@ class RemoteActorResolver
         $user->username = $this->uniqueUsername($preferred . '@' . $domain);
         $user->email = 'remote-' . substr(sha1($actorUrl), 0, 20) . '@federated.invalid';
         $user->status = User::STATUS_ENABLED;
-        $user->visibility = User::VISIBILITY_HIDDEN; // excluded from People directory
+        $user->visibility = User::VISIBILITY_REGISTERED_ONLY; // followable + profile-viewable, off public discovery
 
         try {
             if (!$user->save()) {
@@ -138,5 +138,48 @@ class RemoteActorResolver
             $i++;
         }
         return $candidate;
+    }
+
+    /** Build the WebFinger query URL for a handle like "@user@domain" / "user@domain"; '' if malformed. */
+    public static function webfingerUrl(string $handle): string
+    {
+        $handle = ltrim(trim($handle), '@');
+        if (!preg_match('/^([^@\s]+)@([^@\s]+\.[^@\s]+)$/', $handle, $m)) {
+            return '';
+        }
+        return 'https://' . $m[2] . '/.well-known/webfinger?resource=acct:' . $m[1] . '@' . $m[2];
+    }
+
+    /** Resolve a handle (@user@domain) to a RemoteActor via WebFinger, creating the shadow user. */
+    public function resolveByHandle(string $handle): RemoteActor
+    {
+        $wf = self::webfingerUrl($handle);
+        if ($wf === '' || !UrlSafety::isSafePublicUrl($wf)) {
+            throw new RuntimeException('Invalid or unsafe handle: ' . $handle);
+        }
+
+        $client = new FederationHttpClient();
+        $response = $client->createRequest()
+            ->setMethod('GET')
+            ->setUrl($wf)
+            ->addHeaders(['Accept' => 'application/jrd+json, application/json'])
+            ->send();
+        if (!$response->getIsOk()) {
+            throw new RuntimeException('WebFinger lookup failed (' . $response->getStatusCode() . '): ' . $handle);
+        }
+
+        $jrd = json_decode($response->getContent(), true);
+        $actorUrl = '';
+        foreach ($jrd['links'] ?? [] as $link) {
+            if (($link['rel'] ?? '') === 'self'
+                && in_array($link['type'] ?? '', ['application/activity+json', 'application/ld+json'], true)) {
+                $actorUrl = (string) ($link['href'] ?? '');
+                break;
+            }
+        }
+        if ($actorUrl === '') {
+            throw new RuntimeException('No ActivityPub actor link in WebFinger for ' . $handle);
+        }
+        return $this->resolve($actorUrl);
     }
 }

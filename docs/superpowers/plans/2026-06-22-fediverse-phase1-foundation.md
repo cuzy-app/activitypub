@@ -92,7 +92,7 @@ Naming conventions locked in here and reused by later plans:
     "keywords": ["fediverse", "activitypub", "mastodon"],
     "version": "0.1.0",
     "humhub": {
-        "minVersion": "1.17"
+        "minVersion": "1.19"
     }
 }
 ```
@@ -459,6 +459,8 @@ class LocalActor extends ActiveRecord
         return [
             [
                 'class' => TimestampBehavior::class,
+                'createdAtAttribute' => 'created_at',
+                'updatedAtAttribute' => 'updated_at',
                 'value' => new Expression('NOW()'),
             ],
         ];
@@ -521,6 +523,8 @@ class RemoteActor extends ActiveRecord
         return [
             [
                 'class' => TimestampBehavior::class,
+                'createdAtAttribute' => 'created_at',
+                'updatedAtAttribute' => 'updated_at',
                 'value' => new Expression('NOW()'),
             ],
         ];
@@ -592,6 +596,7 @@ class FederationObject extends ActiveRecord
             [['model_id'], 'integer'],
             [['raw_json'], 'string'],
             [['direction'], 'string', 'max' => 16],
+            [['direction'], 'in', 'range' => [self::DIRECTION_LOCAL, self::DIRECTION_REMOTE]],
             [['object_type'], 'string', 'max' => 32],
             [['ap_id', 'model_class', 'in_reply_to_ap_id'], 'string', 'max' => 255],
             [['ap_id'], 'unique'],
@@ -640,6 +645,8 @@ class FederationFollow extends ActiveRecord
         return [
             [
                 'class' => TimestampBehavior::class,
+                'createdAtAttribute' => 'created_at',
+                'updatedAtAttribute' => 'updated_at',
                 'value' => new Expression('NOW()'),
             ],
         ];
@@ -887,11 +894,11 @@ class AdminController extends Controller
 ```php
 <?php
 
-use humhub\libs\Html;
-use humhub\widgets\Button;
+use humhub\widgets\bootstrap\Button;
+use humhub\widgets\form\ActiveForm;
 use humhub\modules\fediverse\models\ConfigureForm;
-use yii\bootstrap\ActiveForm;
 
+/* @var $this \humhub\components\View */
 /* @var $model ConfigureForm */
 ?>
 <div class="panel panel-default">

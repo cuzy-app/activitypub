@@ -9,6 +9,9 @@ use yii\web\Response;
 
 class NodeinfoController extends Controller
 {
+    /** Public, unauthenticated endpoint. */
+    public $access = null;
+
     public function beforeAction($action)
     {
         Yii::$app->user->enableSession = false;

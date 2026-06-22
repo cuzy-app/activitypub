@@ -3,6 +3,7 @@
 namespace humhub\modules\fediverse\controllers;
 
 use humhub\components\Controller;
+use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\services\DiscoveryPolicy;
 use humhub\modules\fediverse\services\FederationUrl;
 use humhub\modules\fediverse\services\KeyManager;
@@ -14,6 +15,9 @@ use yii\web\Response;
 
 class WebfingerController extends Controller
 {
+    /** Public, unauthenticated endpoint. */
+    public $access = null;
+
     public function beforeAction($action)
     {
         Yii::$app->user->enableSession = false;
@@ -27,11 +31,25 @@ class WebfingerController extends Controller
             throw new BadRequestHttpException('resource must be an acct: URI');
         }
 
-        // acct:handle@domain
         $acct = substr($resource, strlen('acct:'));
-        [$handle, $domain] = array_pad(explode('@', $acct, 2), 2, '');
+        if (!str_contains($acct, '@')) {
+            throw new BadRequestHttpException('resource must be acct:user@domain');
+        }
+        [$handle, $domain] = explode('@', $acct, 2);
         if ($handle === '' || strcasecmp($domain, FederationUrl::domain()) !== 0) {
             throw new NotFoundHttpException();
+        }
+
+        // The instance (Application) actor is discoverable directly when federation is on.
+        $instance = LocalActor::findOne([
+            'preferred_username' => $handle,
+            'type' => LocalActor::TYPE_APPLICATION,
+        ]);
+        if ($instance !== null) {
+            if (!DiscoveryPolicy::isGloballyEnabled()) {
+                throw new NotFoundHttpException();
+            }
+            return $this->jrd($instance->preferred_username, $instance->ap_id, null);
         }
 
         $user = $this->resolveUserByHandle($handle);
@@ -40,30 +58,7 @@ class WebfingerController extends Controller
         }
 
         $actor = (new KeyManager())->getOrCreateForUser($user);
-        $actorUrl = $actor->ap_id;
-
-        $jrd = [
-            'subject' => 'acct:' . $actor->preferred_username . '@' . FederationUrl::domain(),
-            'aliases' => [$actorUrl, $user->getUrl(true)],
-            'links' => [
-                [
-                    'rel' => 'self',
-                    'type' => 'application/activity+json',
-                    'href' => $actorUrl,
-                ],
-                [
-                    'rel' => 'http://webfinger.net/rel/profile-page',
-                    'type' => 'text/html',
-                    'href' => $user->getUrl(true),
-                ],
-            ],
-        ];
-
-        $response = Yii::$app->response;
-        $response->format = Response::FORMAT_JSON;
-        $response->headers->set('Content-Type', 'application/jrd+json; charset=utf-8');
-        $response->data = $jrd;
-        return $response;
+        return $this->jrd($actor->preferred_username, $actor->ap_id, $user->getUrl(true));
     }
 
     /**
@@ -72,10 +67,36 @@ class WebfingerController extends Controller
      */
     private function resolveUserByHandle(string $handle): ?User
     {
-        $actor = \humhub\modules\fediverse\models\LocalActor::findOne(['preferred_username' => $handle]);
+        $actor = LocalActor::findOne(['preferred_username' => $handle]);
         if ($actor !== null && $actor->user_id !== null) {
             return User::findOne($actor->user_id);
         }
         return User::findOne(['username' => $handle]);
+    }
+
+    private function jrd(string $handle, string $actorUrl, ?string $profileUrl): Response
+    {
+        $aliases = [$actorUrl];
+        $links = [
+            ['rel' => 'self', 'type' => 'application/activity+json', 'href' => $actorUrl],
+        ];
+        if ($profileUrl !== null) {
+            $aliases[] = $profileUrl;
+            $links[] = [
+                'rel' => 'http://webfinger.net/rel/profile-page',
+                'type' => 'text/html',
+                'href' => $profileUrl,
+            ];
+        }
+
+        $response = Yii::$app->response;
+        $response->format = Response::FORMAT_JSON;
+        $response->headers->set('Content-Type', 'application/jrd+json; charset=utf-8');
+        $response->data = [
+            'subject' => 'acct:' . $handle . '@' . FederationUrl::domain(),
+            'aliases' => $aliases,
+            'links' => $links,
+        ];
+        return $response;
     }
 }

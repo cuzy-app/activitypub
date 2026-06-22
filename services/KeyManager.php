@@ -5,6 +5,7 @@ namespace humhub\modules\fediverse\services;
 use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\user\models\User;
 use RuntimeException;
+use yii\db\IntegrityException;
 
 /**
  * Provisions and retrieves the local ActivityPub actors and their RSA keypairs.
@@ -28,9 +29,20 @@ class KeyManager
         $actor->ap_id = FederationUrl::actorUrl($user->guid);
         $actor->private_key = $privateKey;
         $actor->public_key = $publicKey;
-        if (!$actor->save()) {
-            throw new RuntimeException('Could not create LocalActor: ' . implode(', ', $actor->getErrorSummary(true)));
+
+        try {
+            if (!$actor->save()) {
+                throw new RuntimeException('Could not create LocalActor: ' . implode(', ', $actor->getErrorSummary(true)));
+            }
+        } catch (IntegrityException $e) {
+            // Lost a race with a concurrent provisioning for the same user; reuse the existing row.
+            $existing = LocalActor::findOne(['user_id' => $user->id]);
+            if ($existing === null) {
+                throw $e;
+            }
+            return $existing;
         }
+
         return $actor;
     }
 
@@ -69,8 +81,13 @@ class KeyManager
         if ($resource === false) {
             throw new RuntimeException('openssl_pkey_new failed: ' . openssl_error_string());
         }
-        openssl_pkey_export($resource, $privateKey);
+        if (!openssl_pkey_export($resource, $privateKey)) {
+            throw new RuntimeException('openssl_pkey_export failed: ' . openssl_error_string());
+        }
         $details = openssl_pkey_get_details($resource);
+        if ($details === false || !isset($details['key'])) {
+            throw new RuntimeException('openssl_pkey_get_details failed: ' . openssl_error_string());
+        }
         return [(string) $privateKey, (string) $details['key']];
     }
 

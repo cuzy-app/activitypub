@@ -21,7 +21,7 @@ class NodeinfoController extends Controller
     /** GET /.well-known/nodeinfo — the discovery document. */
     public function actionIndex()
     {
-        return $this->asJson([
+        return $this->respondJson([
             'links' => [
                 [
                     'rel' => 'http://nodeinfo.diaspora.software/ns/schema/2.1',
@@ -38,7 +38,7 @@ class NodeinfoController extends Controller
         $manifest = json_decode((string) @file_get_contents($module->getBasePath() . '/module.json'), true);
         $version = (string) ($manifest['version'] ?? '0.0.0');
 
-        return $this->asJson([
+        return $this->respondJson([
             'version' => '2.1',
             'software' => [
                 'name' => 'humhub-fediverse',
@@ -55,7 +55,7 @@ class NodeinfoController extends Controller
         ], 'application/json; charset=utf-8');
     }
 
-    private function asJson(array $data, string $contentType): Response
+    private function respondJson(array $data, string $contentType): Response
     {
         $response = Yii::$app->response;
         $response->format = Response::FORMAT_JSON;

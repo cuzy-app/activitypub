@@ -155,6 +155,9 @@ class Events
             'remote_actor_id' => $remote->id,
             'direction' => FederationFollow::DIRECTION_OUTBOUND,
         ]);
+        if ($follow !== null && $follow->state === FederationFollow::STATE_ACCEPTED) {
+            return; // already following; avoid sending a duplicate Follow on re-save
+        }
         if ($follow === null) {
             $follow = new FederationFollow();
             $follow->local_user_id = $follower->id;

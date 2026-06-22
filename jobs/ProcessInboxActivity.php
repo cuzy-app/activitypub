@@ -239,18 +239,20 @@ class ProcessInboxActivity extends ActiveJob
         }
     }
 
-    /** Remote accepted our outbound Follow → mark it accepted. */
+    /** Remote accepted our outbound Follow → mark our pending follow(s) to it accepted. */
     private function handleAccept(array $activity, RemoteActor $remote): void
     {
+        // Accept.object may be an embedded Follow OR a bare string (its AP id) — Mastodon sends a string.
         $inner = $activity['object'] ?? null;
-        if (!is_array($inner) || ($inner['type'] ?? '') !== 'Follow') {
-            return;
+        if (is_array($inner) && ($inner['type'] ?? 'Follow') !== 'Follow') {
+            return; // an embedded non-Follow object; ignore
         }
-        $follow = FederationFollow::findOne([
+        $follows = FederationFollow::findAll([
             'remote_actor_id' => $remote->id,
             'direction' => FederationFollow::DIRECTION_OUTBOUND,
+            'state' => FederationFollow::STATE_PENDING,
         ]);
-        if ($follow !== null) {
+        foreach ($follows as $follow) {
             $follow->state = FederationFollow::STATE_ACCEPTED;
             $follow->save();
         }
@@ -261,7 +263,7 @@ class ProcessInboxActivity extends ActiveJob
     {
         // Only ingest from actors a local user actually follows (we only receive such posts anyway).
         $followed = FederationFollow::find()
-            ->where(['remote_actor_id' => $remote->id, 'direction' => FederationFollow::DIRECTION_OUTBOUND, 'state' => FederationFollow::STATE_ACCEPTED])
+            ->where(['remote_actor_id' => $remote->id, 'direction' => FederationFollow::DIRECTION_OUTBOUND])
             ->exists();
         if (!$followed) {
             return;
@@ -280,6 +282,8 @@ class ProcessInboxActivity extends ActiveJob
         ]);
         $post->created_by = $shadow->id;
         $post->autoFollow = false;
+        $post->content->created_by = $shadow->id; // queue has no logged-in user; Content requires created_by
+        $post->silentContentCreation = true;       // no per-post notification (Mastodon-like timeline behavior)
         try {
             if (!$post->save()) {
                 Yii::warning('Fediverse ingest post failed: ' . implode(', ', $post->getErrorSummary(true)), 'fediverse');

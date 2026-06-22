@@ -18,6 +18,7 @@ return [
         ['pattern' => 'fediverse/instance-actor', 'route' => 'fediverse/actor/instance'],
         ['pattern' => 'fediverse/inbox', 'route' => 'fediverse/inbox/shared', 'verb' => ['POST']],
         ['pattern' => 'fediverse/actor/<guid:[\w\-]+>/inbox', 'route' => 'fediverse/inbox/user', 'verb' => ['POST']],
+        ['pattern' => 'fediverse/actor/<guid:[\w\-]+>/outbox', 'route' => 'fediverse/outbox/index'],
         ['pattern' => 'fediverse/actor/<guid:[\w\-]+>', 'route' => 'fediverse/actor/index'],
     ],
 ];

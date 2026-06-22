@@ -192,6 +192,8 @@ class ProcessInboxActivity extends ActiveJob
             $author = User::findOne($remote->user_id);
             if ($content !== null && $author !== null) {
                 (new InboundInteractionService())->removeLike($content, $author);
+            } else {
+                Yii::warning('Fediverse Undo{Like}: could not resolve content/author', 'fediverse');
             }
         }
     }

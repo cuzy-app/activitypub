@@ -29,6 +29,9 @@ class Events
         }
 
         $author = $content->createdBy;
+        if ($author === null) {
+            return;
+        }
         $actor = (new KeyManager())->getOrCreateForUser($author);
 
         $noteId = $actor->ap_id . '/notes/' . $content->id;
@@ -38,7 +41,7 @@ class Events
             $noteId,
             RichText::output((string) $record->message),
             date('c', strtotime((string) $content->created_at)),
-            $content->getUrl(true),
+            self::absoluteUrl($content),
             self::attachments($record, $serializer)
         );
         $activity = $serializer->wrap('Create', $actor->ap_id, $note, $noteId . '/activity');
@@ -63,7 +66,11 @@ class Events
         if ($noteId === null) {
             return; // was never federated
         }
-        $author = $record->content->createdBy;
+        $content = $record->content;
+        $author = $content?->createdBy;
+        if ($author === null) {
+            return;
+        }
         $actor = (new KeyManager())->getOrCreateForUser($author);
         $activity = (new NoteSerializer())->delete($actor->ap_id, $noteId, $noteId . '/delete');
 
@@ -104,5 +111,16 @@ class Events
             'direction' => FederationObject::DIRECTION_LOCAL,
         ]);
         return $obj?->ap_id;
+    }
+
+    /** Absolute permalink robust in console (queue) context where request hostInfo may be unset. */
+    private static function absoluteUrl(Content $content): string
+    {
+        $url = $content->getUrl(true);
+        $parts = parse_url($url);
+        if (!empty($parts['host'])) {
+            return $url;
+        }
+        return FederationUrl::base() . ($parts['path'] ?? '/') . (isset($parts['query']) ? '?' . $parts['query'] : '');
     }
 }

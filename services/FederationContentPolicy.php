@@ -19,6 +19,9 @@ class FederationContentPolicy
         if (!DiscoveryPolicy::isGloballyEnabled() || !AuthHelper::isGuestAccessEnabled()) {
             return false;
         }
+        if ((int) $content->state !== Content::STATE_PUBLISHED) {
+            return false;
+        }
         if ((int) $content->visibility !== Content::VISIBILITY_PUBLIC) {
             return false;
         }

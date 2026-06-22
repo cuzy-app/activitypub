@@ -5,6 +5,7 @@ use humhub\modules\content\models\Content;
 use humhub\modules\fediverse\services\FederationContentPolicy;
 use humhub\modules\user\models\User;
 use tests\codeception\_support\HumHubDbTestCase;
+use Yii;
 
 class FederationContentPolicyTest extends HumHubDbTestCase
 {

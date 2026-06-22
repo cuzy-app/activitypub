@@ -6,12 +6,19 @@ use humhub\modules\content\events\ContentStateEvent;
 use humhub\modules\content\models\Content;
 use humhub\modules\content\widgets\richtext\RichText;
 use humhub\modules\fediverse\jobs\DeliverActivity;
+use humhub\modules\fediverse\jobs\DeliverToInbox;
+use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\FederationObject;
+use humhub\modules\fediverse\models\LocalActor;
+use humhub\modules\fediverse\models\RemoteActor;
+use humhub\modules\fediverse\services\DiscoveryPolicy;
 use humhub\modules\fediverse\services\FederationContentPolicy;
 use humhub\modules\fediverse\services\FederationUrl;
 use humhub\modules\fediverse\services\KeyManager;
 use humhub\modules\fediverse\services\NoteSerializer;
 use humhub\modules\post\models\Post;
+use humhub\modules\user\events\FollowEvent;
+use humhub\modules\user\models\User;
 use Yii;
 
 class Events
@@ -122,5 +129,96 @@ class Events
             return $url;
         }
         return FederationUrl::base() . ($parts['path'] ?? '/') . (isset($parts['query']) ? '?' . $parts['query'] : '');
+    }
+
+    /** A local user followed someone → if it's a remote shadow actor, send a Follow. */
+    public static function onFollowCreated(FollowEvent $event): void
+    {
+        $follower = $event->user;
+        $target = $event->target;
+        if (!$follower instanceof User || !$target instanceof User) {
+            return;
+        }
+        $remote = RemoteActor::findOne(['user_id' => $target->id]);
+        if ($remote === null) {
+            return; // target is a normal local user, not a federated account
+        }
+        if (!DiscoveryPolicy::isDiscoverable($follower)) {
+            Yii::warning('Fediverse: follower ' . $follower->id . ' is not federatable; remote follow not sent', 'fediverse');
+            return;
+        }
+
+        $signer = (new KeyManager())->getOrCreateForUser($follower);
+
+        $follow = FederationFollow::findOne([
+            'local_user_id' => $follower->id,
+            'remote_actor_id' => $remote->id,
+            'direction' => FederationFollow::DIRECTION_OUTBOUND,
+        ]);
+        if ($follow === null) {
+            $follow = new FederationFollow();
+            $follow->local_user_id = $follower->id;
+            $follow->remote_actor_id = $remote->id;
+            $follow->direction = FederationFollow::DIRECTION_OUTBOUND;
+        }
+        $follow->state = FederationFollow::STATE_PENDING;
+        $follow->activity_ap_id = $signer->ap_id . '/follows/' . bin2hex(random_bytes(8));
+        $follow->save();
+
+        $activity = [
+            '@context' => 'https://www.w3.org/ns/activitystreams',
+            'id' => $follow->activity_ap_id,
+            'type' => 'Follow',
+            'actor' => $signer->ap_id,
+            'object' => $remote->ap_id,
+        ];
+        Yii::$app->queue->push(new DeliverToInbox([
+            'signerUserId' => $follower->id,
+            'inboxUrl' => $remote->inbox_url,
+            'activityJson' => json_encode($activity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ]));
+    }
+
+    /** A local user unfollowed a remote shadow actor → send Undo{Follow}. */
+    public static function onFollowRemoved(FollowEvent $event): void
+    {
+        $follower = $event->user;
+        $target = $event->target;
+        if (!$follower instanceof User || !$target instanceof User) {
+            return;
+        }
+        $remote = RemoteActor::findOne(['user_id' => $target->id]);
+        if ($remote === null) {
+            return;
+        }
+        $follow = FederationFollow::findOne([
+            'local_user_id' => $follower->id,
+            'remote_actor_id' => $remote->id,
+            'direction' => FederationFollow::DIRECTION_OUTBOUND,
+        ]);
+        if ($follow === null) {
+            return;
+        }
+        $signer = LocalActor::findOne(['user_id' => $follower->id]);
+        if ($signer !== null) {
+            $undo = [
+                '@context' => 'https://www.w3.org/ns/activitystreams',
+                'id' => $signer->ap_id . '/undos/' . bin2hex(random_bytes(8)),
+                'type' => 'Undo',
+                'actor' => $signer->ap_id,
+                'object' => [
+                    'id' => $follow->activity_ap_id,
+                    'type' => 'Follow',
+                    'actor' => $signer->ap_id,
+                    'object' => $remote->ap_id,
+                ],
+            ];
+            Yii::$app->queue->push(new DeliverToInbox([
+                'signerUserId' => $follower->id,
+                'inboxUrl' => $remote->inbox_url,
+                'activityJson' => json_encode($undo, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            ]));
+        }
+        $follow->delete();
     }
 }

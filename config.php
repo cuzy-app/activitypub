@@ -7,6 +7,8 @@ return [
     'events' => [
         ['class' => 'humhub\modules\content\models\Content', 'event' => 'changedState', 'callback' => ['humhub\modules\fediverse\Events', 'onContentStateChanged']],
         ['class' => 'humhub\modules\post\models\Post', 'event' => 'afterSoftDelete', 'callback' => ['humhub\modules\fediverse\Events', 'onContentDeleted']],
+        ['class' => 'humhub\modules\user\models\Follow', 'event' => 'followCreated', 'callback' => ['humhub\modules\fediverse\Events', 'onFollowCreated']],
+        ['class' => 'humhub\modules\user\models\Follow', 'event' => 'followRemoved', 'callback' => ['humhub\modules\fediverse\Events', 'onFollowRemoved']],
     ],
     'consoleControllerMap' => [
         'fediverse' => 'humhub\modules\fediverse\commands\FediverseController',

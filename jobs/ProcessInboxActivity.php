@@ -60,6 +60,9 @@ class ProcessInboxActivity extends ActiveJob
             case 'Like':
                 $this->handleLike($activity, $remote);
                 break;
+            case 'Accept':
+                $this->handleAccept($activity, $remote);
+                break;
             default:
                 Yii::info('Fediverse inbox: ignoring unsupported type ' . $activity['type'], 'fediverse');
         }
@@ -207,7 +210,8 @@ class ProcessInboxActivity extends ActiveJob
         }
         $inReplyTo = $object['inReplyTo'] ?? null;
         if (!is_string($inReplyTo) || $inReplyTo === '') {
-            return; // top-level remote posts are not ingested in this phase, only replies to us
+            $this->ingestRemotePost($object, $remote);
+            return;
         }
         $content = (new LocalObjectResolver())->resolveContent($inReplyTo);
         if ($content === null) {
@@ -233,6 +237,66 @@ class ProcessInboxActivity extends ActiveJob
         if ($content !== null && $author !== null) {
             (new InboundInteractionService())->addLike($content, $author, (string) ($activity['id'] ?? ''));
         }
+    }
+
+    /** Remote accepted our outbound Follow → mark it accepted. */
+    private function handleAccept(array $activity, RemoteActor $remote): void
+    {
+        $inner = $activity['object'] ?? null;
+        if (!is_array($inner) || ($inner['type'] ?? '') !== 'Follow') {
+            return;
+        }
+        $follow = FederationFollow::findOne([
+            'remote_actor_id' => $remote->id,
+            'direction' => FederationFollow::DIRECTION_OUTBOUND,
+        ]);
+        if ($follow !== null) {
+            $follow->state = FederationFollow::STATE_ACCEPTED;
+            $follow->save();
+        }
+    }
+
+    /** Ingest a followed remote actor's top-level Note as a Post on the shadow profile. */
+    private function ingestRemotePost(array $note, RemoteActor $remote): void
+    {
+        // Only ingest from actors a local user actually follows (we only receive such posts anyway).
+        $followed = FederationFollow::find()
+            ->where(['remote_actor_id' => $remote->id, 'direction' => FederationFollow::DIRECTION_OUTBOUND, 'state' => FederationFollow::STATE_ACCEPTED])
+            ->exists();
+        if (!$followed) {
+            return;
+        }
+        $noteId = (string) ($note['id'] ?? '');
+        if ($noteId === '' || \humhub\modules\fediverse\models\FederationObject::find()->where(['ap_id' => $noteId])->exists()) {
+            return; // malformed or already ingested
+        }
+        $shadow = User::findOne($remote->user_id);
+        if ($shadow === null) {
+            return;
+        }
+
+        $post = new \humhub\modules\post\models\Post($shadow, \humhub\modules\content\models\Content::VISIBILITY_PUBLIC, [
+            'message' => trim(strip_tags((string) ($note['content'] ?? ''))),
+        ]);
+        $post->created_by = $shadow->id;
+        $post->autoFollow = false;
+        try {
+            if (!$post->save()) {
+                Yii::warning('Fediverse ingest post failed: ' . implode(', ', $post->getErrorSummary(true)), 'fediverse');
+                return;
+            }
+        } catch (\Throwable $e) {
+            Yii::warning('Fediverse ingest post error: ' . $e->getMessage(), 'fediverse');
+            return;
+        }
+
+        $obj = new \humhub\modules\fediverse\models\FederationObject();
+        $obj->ap_id = $noteId;
+        $obj->direction = \humhub\modules\fediverse\models\FederationObject::DIRECTION_REMOTE;
+        $obj->object_type = 'Note';
+        $obj->model_class = \humhub\modules\post\models\Post::class;
+        $obj->model_id = $post->id;
+        $obj->save();
     }
 
     /** Extract an object id from an AP value that may be a string or an embedded object. */

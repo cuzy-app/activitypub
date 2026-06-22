@@ -6,6 +6,8 @@ use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\models\RemoteActor;
 use humhub\modules\fediverse\services\ActivityDelivery;
+use humhub\modules\fediverse\services\InboundInteractionService;
+use humhub\modules\fediverse\services\LocalObjectResolver;
 use humhub\modules\fediverse\services\RemoteActorResolver;
 use humhub\modules\fediverse\services\SignatureService;
 use humhub\modules\queue\ActiveJob;
@@ -51,6 +53,12 @@ class ProcessInboxActivity extends ActiveJob
                 break;
             case 'Undo':
                 $this->handleUndo($activity, $remote);
+                break;
+            case 'Create':
+                $this->handleCreate($activity, $remote);
+                break;
+            case 'Like':
+                $this->handleLike($activity, $remote);
                 break;
             default:
                 Yii::info('Fediverse inbox: ignoring unsupported type ' . $activity['type'], 'fediverse');
@@ -161,18 +169,77 @@ class ProcessInboxActivity extends ActiveJob
     private function handleUndo(array $activity, RemoteActor $remote): void
     {
         $inner = $activity['object'] ?? null;
-        if (!is_array($inner) || ($inner['type'] ?? '') !== 'Follow') {
-            return; // only Undo{Follow} in this phase
-        }
-        $localUser = $this->resolveFollowTarget($inner['object'] ?? null);
-        if ($localUser === null) {
+        if (!is_array($inner)) {
             return;
         }
-        FederationFollow::deleteAll([
-            'local_user_id' => $localUser->id,
-            'remote_actor_id' => $remote->id,
-            'direction' => FederationFollow::DIRECTION_INBOUND,
-        ]);
+        $type = $inner['type'] ?? '';
+
+        if ($type === 'Follow') {
+            $localUser = $this->resolveFollowTarget($inner['object'] ?? null);
+            if ($localUser === null) {
+                return;
+            }
+            FederationFollow::deleteAll([
+                'local_user_id' => $localUser->id,
+                'remote_actor_id' => $remote->id,
+                'direction' => FederationFollow::DIRECTION_INBOUND,
+            ]);
+            return;
+        }
+
+        if ($type === 'Like') {
+            $content = (new LocalObjectResolver())->resolveContent($this->objectId($inner['object'] ?? null));
+            $author = User::findOne($remote->user_id);
+            if ($content !== null && $author !== null) {
+                (new InboundInteractionService())->removeLike($content, $author);
+            }
+        }
+    }
+
+    /** Inbound Create{Note, inReplyTo} → comment on the replied-to local content. */
+    private function handleCreate(array $activity, RemoteActor $remote): void
+    {
+        $object = $activity['object'] ?? null;
+        if (!is_array($object) || ($object['type'] ?? '') !== 'Note') {
+            return;
+        }
+        $inReplyTo = $object['inReplyTo'] ?? null;
+        if (!is_string($inReplyTo) || $inReplyTo === '') {
+            return; // top-level remote posts are not ingested in this phase, only replies to us
+        }
+        $content = (new LocalObjectResolver())->resolveContent($inReplyTo);
+        if ($content === null) {
+            return; // a reply to something we don't host
+        }
+        $author = User::findOne($remote->user_id);
+        if ($author === null) {
+            return;
+        }
+        (new InboundInteractionService())->addComment(
+            $content,
+            $author,
+            (string) ($object['content'] ?? ''),
+            (string) ($object['id'] ?? '')
+        );
+    }
+
+    /** Inbound Like → like the referenced local content. */
+    private function handleLike(array $activity, RemoteActor $remote): void
+    {
+        $content = (new LocalObjectResolver())->resolveContent($this->objectId($activity['object'] ?? null));
+        $author = User::findOne($remote->user_id);
+        if ($content !== null && $author !== null) {
+            (new InboundInteractionService())->addLike($content, $author, (string) ($activity['id'] ?? ''));
+        }
+    }
+
+    /** Extract an object id from an AP value that may be a string or an embedded object. */
+    private function objectId($value): string
+    {
+        if (is_array($value)) {
+            return (string) ($value['id'] ?? '');
+        }
+        return (string) $value;
     }
 
     private function resolveFollowTarget($object): ?User

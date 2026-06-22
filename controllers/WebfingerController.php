@@ -31,7 +31,8 @@ class WebfingerController extends Controller
             throw new BadRequestHttpException('resource must be an acct: URI');
         }
 
-        $acct = substr($resource, strlen('acct:'));
+        // Tolerate a leading '@' (some clients send acct:@user@domain).
+        $acct = ltrim(substr($resource, strlen('acct:')), '@');
         if (!str_contains($acct, '@')) {
             throw new BadRequestHttpException('resource must be acct:user@domain');
         }

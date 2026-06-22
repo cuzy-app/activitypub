@@ -90,13 +90,13 @@ class WebfingerController extends Controller
         }
 
         $response = Yii::$app->response;
-        $response->format = Response::FORMAT_JSON;
+        $response->format = Response::FORMAT_RAW;
         $response->headers->set('Content-Type', 'application/jrd+json; charset=utf-8');
-        $response->data = [
+        $response->content = json_encode([
             'subject' => 'acct:' . $handle . '@' . FederationUrl::domain(),
             'aliases' => $aliases,
             'links' => $links,
-        ];
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         return $response;
     }
 }

@@ -58,9 +58,9 @@ class NodeinfoController extends Controller
     private function respondJson(array $data, string $contentType): Response
     {
         $response = Yii::$app->response;
-        $response->format = Response::FORMAT_JSON;
+        $response->format = Response::FORMAT_RAW;
         $response->headers->set('Content-Type', $contentType);
-        $response->data = $data;
+        $response->content = json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         return $response;
     }
 }

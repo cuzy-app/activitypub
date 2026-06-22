@@ -52,9 +52,9 @@ class ActorController extends Controller
     private function asActivityJson(array $doc): Response
     {
         $response = Yii::$app->response;
-        $response->format = Response::FORMAT_JSON;
+        $response->format = Response::FORMAT_RAW;
         $response->headers->set('Content-Type', 'application/activity+json; charset=utf-8');
-        $response->data = $doc;
+        $response->content = json_encode($doc, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         return $response;
     }
 }

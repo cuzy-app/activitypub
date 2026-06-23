@@ -281,6 +281,9 @@ class Events
     public static function onCommentCreated($event): void
     {
         $comment = $event->sender;
+        if (!empty($comment->parent_comment_id)) {
+            return; // reply to a comment, not the post — inReplyTo would be wrong; out of scope this phase
+        }
         $actor = self::federatableActor((int) $comment->created_by);
         if ($actor === null) {
             return; // shadow user (inbound comment — loop guard) or non-federatable

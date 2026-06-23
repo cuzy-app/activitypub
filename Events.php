@@ -15,6 +15,7 @@ use humhub\modules\fediverse\services\DiscoveryPolicy;
 use humhub\modules\fediverse\services\FederationContentPolicy;
 use humhub\modules\fediverse\services\FederationUrl;
 use humhub\modules\fediverse\services\RemoteTargetResolver;
+use humhub\modules\comment\models\Comment;
 use humhub\modules\like\models\Like;
 use humhub\modules\fediverse\services\KeyManager;
 use humhub\modules\fediverse\services\NoteSerializer;
@@ -273,6 +274,47 @@ class Events
             'signerUserId' => (int) $like->created_by,
             'inboxUrl' => $target['remote']->inbox_url,
             'activityJson' => json_encode($activity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ]));
+    }
+
+    /** Local user commented on a remote-origin post → send Create{Note, inReplyTo}. */
+    public static function onCommentCreated($event): void
+    {
+        $comment = $event->sender;
+        $actor = self::federatableActor((int) $comment->created_by);
+        if ($actor === null) {
+            return; // shadow user (inbound comment — loop guard) or non-federatable
+        }
+        $target = (new RemoteTargetResolver())->resolve((int) $comment->content_id);
+        if ($target === null) {
+            return; // not a reply to a remote-origin post
+        }
+
+        $noteApId = $actor->ap_id . '/comments/' . (int) $comment->id;
+        self::recordObject($noteApId, 'Note', Comment::class, (int) $comment->id);
+
+        $note = [
+            'id' => $noteApId,
+            'type' => 'Note',
+            'attributedTo' => $actor->ap_id,
+            'content' => RichText::output((string) $comment->message),
+            'inReplyTo' => $target['noteApId'],
+            'to' => [$target['remote']->ap_id],
+            'cc' => ['https://www.w3.org/ns/activitystreams#Public'],
+        ];
+        $create = [
+            '@context' => 'https://www.w3.org/ns/activitystreams',
+            'id' => $noteApId . '/activity',
+            'type' => 'Create',
+            'actor' => $actor->ap_id,
+            'to' => [$target['remote']->ap_id],
+            'cc' => ['https://www.w3.org/ns/activitystreams#Public'],
+            'object' => $note,
+        ];
+        Yii::$app->queue->push(new DeliverToInbox([
+            'signerUserId' => (int) $comment->created_by,
+            'inboxUrl' => $target['remote']->inbox_url,
+            'activityJson' => json_encode($create, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         ]));
     }
 

@@ -64,6 +64,9 @@ class FediverseController extends Controller
                 if (is_string($user->email) && str_ends_with($user->email, '@federated.invalid')) {
                     $user->email = null;
                 }
+                // Normalise visibility: early shadow users were created HIDDEN; all federated
+                // users should be REGISTERED_ONLY (visible to members in People, off guest directory).
+                $user->visibility = User::VISIBILITY_REGISTERED_ONLY;
                 if (!$user->save()) {
                     $this->stderr('  user ' . $user->id . ' save failed: ' . implode(', ', $user->getErrorSummary(true)) . "\n");
                     $errors++;

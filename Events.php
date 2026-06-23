@@ -293,12 +293,14 @@ class Events
         $noteApId = $actor->ap_id . '/comments/' . (int) $comment->id;
         self::recordObject($noteApId, 'Note', Comment::class, (int) $comment->id);
 
+        $published = date('c', strtotime((string) $comment->created_at));
         $note = [
             'id' => $noteApId,
             'type' => 'Note',
             'attributedTo' => $actor->ap_id,
             'content' => RichText::output((string) $comment->message),
             'inReplyTo' => $target['noteApId'],
+            'published' => $published,
             'to' => [$target['remote']->ap_id],
             'cc' => ['https://www.w3.org/ns/activitystreams#Public'],
         ];
@@ -307,6 +309,7 @@ class Events
             'id' => $noteApId . '/activity',
             'type' => 'Create',
             'actor' => $actor->ap_id,
+            'published' => $published,
             'to' => [$target['remote']->ap_id],
             'cc' => ['https://www.w3.org/ns/activitystreams#Public'],
             'object' => $note,

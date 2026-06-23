@@ -67,7 +67,7 @@ class PersonSerializer
     {
         $about = trim((string) ($user->profile?->about ?? ''));
         return [
-            'summary' => $about !== '' ? RichText::output($about) : null,
+            'summary' => $about !== '' ? RichText::convert($about, RichText::FORMAT_HTML) : null,
             'icon' => ['type' => 'Image', 'url' => $user->getProfileImage()->getUrl(null, true)],
         ];
     }

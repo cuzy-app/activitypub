@@ -34,6 +34,9 @@
 - Enh: Comment-level federation — local likes/replies on remote comments are sent
   to the comment's author, and remote likes on local comments are recorded on the
   comment (not the post).
+- Fix: Federated content (posts, comments, bios) is rendered to clean HTML —
+  Markdown becomes real markup (bold/links) and emoji become Unicode — instead of
+  raw markdown wrapped in editor-widget HTML that remote servers showed verbatim.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

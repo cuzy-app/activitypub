@@ -53,7 +53,7 @@ class Events
         $note = $serializer->note(
             $actor->ap_id,
             $noteId,
-            RichText::output((string) $record->message),
+            RichText::convert((string) $record->message, RichText::FORMAT_HTML),
             date('c', strtotime((string) $content->created_at)),
             self::absoluteUrl($content),
             self::attachments($record, $serializer)
@@ -378,7 +378,7 @@ class Events
             'id' => $noteApId,
             'type' => 'Note',
             'attributedTo' => $actor->ap_id,
-            'content' => RichText::output((string) $comment->message),
+            'content' => RichText::convert((string) $comment->message, RichText::FORMAT_HTML),
             'inReplyTo' => $target['noteApId'],
             'published' => $published,
             'to' => [$target['remote']->ap_id],
@@ -433,7 +433,7 @@ class Events
             'id' => $noteApId,
             'type' => 'Note',
             'attributedTo' => $actor->ap_id,
-            'content' => RichText::output((string) $comment->message),
+            'content' => RichText::convert((string) $comment->message, RichText::FORMAT_HTML),
             'inReplyTo' => $postNoteId,
             'published' => $published,
             'to' => [$authorActor->ap_id],

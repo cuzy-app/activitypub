@@ -126,7 +126,38 @@ class RemoteActorResolver
             $defaultGroup->addUser($user);
         }
 
+        $this->applyProfileImages($user, $doc);
+
         return $user;
+    }
+
+    /** Download the actor doc's avatar (icon) + banner (image) and set them on the user. Best-effort. */
+    public function applyProfileImages(User $user, array $doc): void
+    {
+        $fetcher = new RemoteMediaFetcher();
+        $this->applyOneImage($user->image, is_array($doc['icon'] ?? null) ? ($doc['icon']['url'] ?? null) : null, $fetcher);
+        $this->applyOneImage($user->bannerImage, is_array($doc['image'] ?? null) ? ($doc['image']['url'] ?? null) : null, $fetcher);
+    }
+
+    /** @param mixed $assetImage a humhub AssetImage ($user->image / $user->bannerImage) */
+    private function applyOneImage($assetImage, ?string $url, RemoteMediaFetcher $fetcher): void
+    {
+        $media = $fetcher->fetchImage($url);
+        if ($media === null) {
+            return;
+        }
+        $tmp = tempnam(sys_get_temp_dir(), 'fedimg');
+        if ($tmp === false) {
+            return;
+        }
+        try {
+            file_put_contents($tmp, $media['content']);
+            $assetImage->setByFile($tmp);
+        } catch (\Throwable $e) {
+            Yii::warning('Fediverse profile image set failed: ' . $e->getMessage(), 'fediverse');
+        } finally {
+            @unlink($tmp);
+        }
     }
 
     private function uniqueUsername(string $base): string

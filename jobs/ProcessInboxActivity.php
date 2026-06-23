@@ -7,13 +7,16 @@ use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\FederationObject;
 use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\models\RemoteActor;
+use humhub\modules\file\models\File;
 use humhub\modules\post\models\Post;
 use humhub\modules\fediverse\services\ActivityDelivery;
 use humhub\modules\fediverse\services\InboundInteractionService;
 use humhub\modules\fediverse\services\LocalObjectResolver;
 use humhub\modules\fediverse\services\RemoteActorResolver;
+use humhub\modules\fediverse\services\RemoteMediaFetcher;
 use humhub\modules\fediverse\services\SignatureService;
 use humhub\modules\queue\ActiveJob;
+use humhub\modules\user\models\Profile;
 use humhub\modules\user\models\User;
 use Yii;
 
@@ -259,12 +262,20 @@ class ProcessInboxActivity extends ActiveJob
         FederationObject::deleteAll(['ap_id' => $apId, 'direction' => FederationObject::DIRECTION_REMOTE]);
     }
 
-    /** Inbound Update{Note} → update the ingested remote post/comment content (author only). */
+    /** Inbound Update{Note|Person|…} → update content or refresh remote actor. */
     private function handleUpdate(array $activity, RemoteActor $remote): void
     {
         $object = $activity['object'] ?? null;
-        if (!is_array($object) || ($object['type'] ?? '') !== 'Note') {
-            return; // Update{Person} and other types are out of scope here
+        if (!is_array($object)) {
+            return;
+        }
+        $objType = $object['type'] ?? '';
+        if (in_array($objType, ['Person', 'Application', 'Service', 'Group', 'Organization'], true)) {
+            $this->refreshRemoteActor($object, $remote);
+            return;
+        }
+        if ($objType !== 'Note') {
+            return;
         }
         $record = $this->resolveRemoteRecord((string) ($object['id'] ?? ''));
         if ($record === null) {
@@ -282,6 +293,52 @@ class ProcessInboxActivity extends ActiveJob
         } catch (\Throwable $e) {
             Yii::warning('Fediverse Update error: ' . $e->getMessage(), 'fediverse');
         }
+    }
+
+    /** Inbound Update{Person} → refresh the remote actor's shadow user (name, bio, avatar, banner). */
+    private function refreshRemoteActor(array $doc, RemoteActor $remote): void
+    {
+        // An actor may only update itself.
+        if ((string) ($doc['id'] ?? '') !== $remote->ap_id) {
+            Yii::warning('Fediverse Update{Person}: object id does not match the signing actor', 'fediverse');
+            return;
+        }
+
+        if (isset($doc['preferredUsername'])) {
+            $remote->preferred_username = (string) $doc['preferredUsername'];
+        }
+        if (!empty($doc['publicKey']['publicKeyPem'])) {
+            $remote->public_key = (string) $doc['publicKey']['publicKeyPem'];
+        }
+        if (is_array($doc['icon'] ?? null) && !empty($doc['icon']['url'])) {
+            $remote->icon_url = (string) $doc['icon']['url'];
+        }
+        $remote->last_refreshed_at = date('Y-m-d H:i:s');
+        $remote->save();
+
+        $user = User::findOne($remote->user_id);
+        if ($user === null) {
+            return;
+        }
+
+        $profile = $user->profile;
+        $name = trim((string) ($doc['name'] ?? '')) ?: (string) ($doc['preferredUsername'] ?? '');
+        if ($name !== '' && $profile !== null) {
+            $profile->firstname = mb_substr($name, 0, 255);
+            if (empty($profile->lastname)) {
+                // HumHub requires a last name; shadow profiles use the domain (matches createShadowUser).
+                $profile->lastname = mb_substr((string) ($remote->domain ?: parse_url((string) $remote->ap_id, PHP_URL_HOST)), 0, 255);
+            }
+            $summary = trim(strip_tags((string) ($doc['summary'] ?? '')));
+            if ($summary !== '') {
+                $profile->about = $summary;
+            }
+            if (!$profile->save()) {
+                Yii::warning('Fediverse Update{Person}: profile save failed: ' . implode(', ', $profile->getErrorSummary(true)), 'fediverse');
+            }
+        }
+
+        (new RemoteActorResolver())->applyProfileImages($user, $doc);
     }
 
     /** Resolve a remote-origin AP object id to the ingested local record (Post or Comment), or null. */
@@ -387,6 +444,50 @@ class ProcessInboxActivity extends ActiveJob
         $obj->model_class = \humhub\modules\post\models\Post::class;
         $obj->model_id = $post->id;
         $obj->save();
+
+        $this->attachRemoteImages($post, $note);
+    }
+
+    private const MAX_ATTACHMENTS = 8;
+
+    /** Download a remote Note's image attachments and attach them to the ingested post. */
+    private function attachRemoteImages(Post $post, array $note): void
+    {
+        $attachments = $note['attachment'] ?? null;
+        if (!is_array($attachments)) {
+            return;
+        }
+        $fetcher = new RemoteMediaFetcher();
+        $count = 0;
+        foreach ($attachments as $att) {
+            if ($count >= self::MAX_ATTACHMENTS) {
+                break;
+            }
+            $url = is_array($att) ? ($att['url'] ?? null) : null;
+            if (!is_string($url)) {
+                continue;
+            }
+            $media = $fetcher->fetchImage($url);
+            if ($media === null) {
+                continue; // non-image / unsafe / too big / failed
+            }
+            try {
+                $file = new File();
+                $file->file_name = $fetcher->filenameFor($url, $media['mime']);
+                $file->mime_type = $media['mime'];
+                $file->size = strlen($media['content']);
+                $file->created_by = (int) $post->content->created_by; // shadow user; queue has no logged-in user
+                if (!$file->save()) {
+                    Yii::warning('Fediverse attachment File save failed: ' . implode(', ', $file->getErrorSummary(true)), 'fediverse');
+                    continue;
+                }
+                $file->setStoredFileContent($media['content']);
+                $post->fileManager->attach($file);
+                $count++;
+            } catch (\Throwable $e) {
+                Yii::warning('Fediverse attachment error for ' . $url . ': ' . $e->getMessage(), 'fediverse');
+            }
+        }
     }
 
     /** Extract an object id from an AP value that may be a string or an embedded object. */

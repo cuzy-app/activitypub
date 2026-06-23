@@ -40,6 +40,11 @@
 - Enh: Inbound edits & deletes — when a remote account deletes or edits a post or
   comment we ingested, it is reflected locally (soft-delete or updated text),
   authorized to the content's author.
+- Enh: Remote media — remote avatars and headers are downloaded into the shadow
+  user's profile and banner image, images attached to a remote post become native
+  file attachments, and an inbound `Update{Person}` refreshes a remote user's
+  name, bio, avatar and banner. Downloads are SSRF-guarded, HTTPS-only, restricted
+  to raster image types, and size-capped.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

@@ -70,24 +70,27 @@ class FediverseController extends Controller
                     continue;
                 }
 
-                // Best-effort media + name/bio backfill from a fresh actor fetch.
+                // Set fediverse identity fields from the cached remote record — runs even if the actor
+                // fetch fails (e.g. 410 Gone), so identity/display is always fixed.
+                $profile = $user->profile;
+                if ($profile !== null) {
+                    $profile->fediverse_handle = mb_substr('@' . $remote->handle, 0, 255);
+                    $profile->fediverse_displayname = mb_substr((string) $remote->preferred_username, 0, 255);
+                    $profile->firstname = null;
+                    $profile->lastname = null;
+                    $profile->save(false);
+                }
+
+                // Best-effort upgrade from a fresh actor fetch: better displayname, bio, images.
                 try {
                     $doc = $resolver->fetchActorDocument($remote->ap_id);
                     $resolver->applyProfileImages($user, $doc);
-                    $profile = $user->profile;
                     if ($profile !== null) {
                         $name = trim((string) ($doc['name'] ?? '')) ?: (string) $remote->preferred_username;
-                        if ($name !== '') {
-                            $profile->firstname = mb_substr($name, 0, 255);
-                        }
-                        if (empty($profile->lastname)) {
-                            $profile->lastname = mb_substr((string) $remote->domain, 0, 255);
-                        }
+                        $profile->fediverse_displayname = mb_substr($name, 0, 255);
                         $summary = trim(strip_tags((string) ($doc['summary'] ?? '')));
-                        if ($summary !== '') {
-                            $profile->about = $summary;
-                        }
-                        $profile->save();
+                        $profile->about = $summary !== '' ? $summary : $profile->about;
+                        $profile->save(false);
                     }
                 } catch (\Throwable $e) {
                     $this->stdout('  backfill skipped for ' . $remote->handle . ': ' . $e->getMessage() . "\n");

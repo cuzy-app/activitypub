@@ -51,6 +51,12 @@
   synthetic email. The `fediverse/migrate-shadow-users` console command brings
   existing federated users onto this model and backfills avatar/banner/bio.
   (Requires the core per-source optional-email change, HumHub PR #8239.)
+- Enh: Federated identity lives in dedicated, protected profile fields — a new
+  "Fediverse" category with `fediverse_displayname` and `fediverse_handle` —
+  instead of being squeezed into first/last name; the display name and its
+  `@user@domain` sub-line are rendered via `displayNameCallback`, so a remote
+  user shows as their real name (not `name domain`) and local users are
+  unaffected.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

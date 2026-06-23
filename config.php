@@ -5,6 +5,7 @@ return [
     'class' => 'humhub\modules\fediverse\Module',
     'namespace' => 'humhub\modules\fediverse',
     'events' => [
+        ['class' => 'yii\base\Application', 'event' => 'beforeRequest', 'callback' => ['humhub\modules\fediverse\Events', 'onBeforeRequest']],
         ['class' => 'humhub\modules\content\models\Content', 'event' => 'changedState', 'callback' => ['humhub\modules\fediverse\Events', 'onContentStateChanged']],
         ['class' => 'humhub\modules\post\models\Post', 'event' => 'afterSoftDelete', 'callback' => ['humhub\modules\fediverse\Events', 'onContentDeleted']],
         ['class' => 'humhub\modules\user\models\Follow', 'event' => 'followCreated', 'callback' => ['humhub\modules\fediverse\Events', 'onFollowCreated']],

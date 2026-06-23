@@ -457,6 +457,48 @@ class Events
         ]));
     }
 
+    /** Set the display-name callbacks so federated users render from their Fediverse fields. */
+    public static function onBeforeRequest(): void
+    {
+        $userModule = Yii::$app->getModule('user');
+        $userModule->displayNameCallback = [self::class, 'displayName'];
+        $userModule->displayNameSubCallback = [self::class, 'displayNameSub'];
+    }
+
+    /** Federated users → their Fediverse display name (fallback handle/username); others → HumHub default. */
+    public static function displayName($user): string
+    {
+        if (!$user instanceof User) {
+            return '';
+        }
+        if ($user->user_source === FederatedUserSource::ID && $user->profile !== null) {
+            $dn = trim((string) $user->profile->fediverse_displayname);
+            if ($dn !== '') {
+                return $dn;
+            }
+            $handle = trim((string) $user->profile->fediverse_handle);
+            return $handle !== '' ? $handle : $user->username;
+        }
+        // HumHub default (mirrors User::getDisplayName)
+        $name = '';
+        if ($user->profile !== null && Yii::$app->settings->get('displayNameFormat') === '{profile.firstname} {profile.lastname}') {
+            $name = $user->profile->firstname . ' ' . $user->profile->lastname;
+        }
+        return ($name === '' || $name === ' ') ? $user->username : $name;
+    }
+
+    /** Federated users → their handle as the secondary line; others → HumHub default sub. */
+    public static function displayNameSub($user): string
+    {
+        if (!$user instanceof User || $user->profile === null) {
+            return '';
+        }
+        if ($user->user_source === FederatedUserSource::ID) {
+            return trim((string) $user->profile->fediverse_handle);
+        }
+        return $user->profile->getFieldValue(Yii::$app->settings->get('displayNameSubFormat', ''), false, false) ?? '';
+    }
+
     /** Register the Fediverse UserSource so it governs federated shadow users. */
     public static function onUserSourceCollectionSet($event): void
     {

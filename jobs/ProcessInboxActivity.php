@@ -191,12 +191,12 @@ class ProcessInboxActivity extends ActiveJob
         }
 
         if ($type === 'Like') {
-            $content = (new LocalObjectResolver())->resolveContent($this->objectId($inner['object'] ?? null));
+            $record = (new LocalObjectResolver())->resolveLikeable($this->objectId($inner['object'] ?? null));
             $author = User::findOne($remote->user_id);
-            if ($content !== null && $author !== null) {
-                (new InboundInteractionService())->removeLike($content, $author);
+            if ($record !== null && $author !== null) {
+                (new InboundInteractionService())->removeLike($record, $author);
             } else {
-                Yii::warning('Fediverse Undo{Like}: could not resolve content/author', 'fediverse');
+                Yii::warning('Fediverse Undo{Like}: could not resolve likeable/author', 'fediverse');
             }
         }
     }
@@ -232,10 +232,13 @@ class ProcessInboxActivity extends ActiveJob
     /** Inbound Like → like the referenced local content. */
     private function handleLike(array $activity, RemoteActor $remote): void
     {
-        $content = (new LocalObjectResolver())->resolveContent($this->objectId($activity['object'] ?? null));
+        $apId = $this->objectId($activity['object'] ?? null);
+        $record = (new LocalObjectResolver())->resolveLikeable($apId);
         $author = User::findOne($remote->user_id);
-        if ($content !== null && $author !== null) {
-            (new InboundInteractionService())->addLike($content, $author, (string) ($activity['id'] ?? ''));
+        if ($record !== null && $author !== null) {
+            (new InboundInteractionService())->addLike($record, $author, (string) ($activity['id'] ?? ''));
+        } else {
+            Yii::warning('Fediverse Like: could not resolve likeable/author for ' . $apId, 'fediverse');
         }
     }
 

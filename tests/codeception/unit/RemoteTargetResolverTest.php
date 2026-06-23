@@ -10,4 +10,9 @@ class RemoteTargetResolverTest extends HumHubDbTestCase
     {
         $this->assertNull((new RemoteTargetResolver())->resolve(999999));
     }
+
+    public function testUnknownCommentResolvesNull()
+    {
+        $this->assertNull((new RemoteTargetResolver())->resolveComment(999999));
+    }
 }

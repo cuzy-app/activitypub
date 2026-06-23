@@ -2,8 +2,10 @@
 
 namespace humhub\modules\fediverse;
 
+use humhub\models\RecordMap;
 use humhub\modules\comment\models\Comment;
 use humhub\modules\content\events\ContentStateEvent;
+use humhub\modules\content\interfaces\ContentOwner;
 use humhub\modules\content\models\Content;
 use humhub\modules\content\widgets\richtext\RichText;
 use humhub\modules\fediverse\jobs\DeliverActivity;
@@ -246,27 +248,37 @@ class Events
         $follow->delete();
     }
 
-    /** Local user liked a remote-origin post → send Like to the remote author. */
+    /** The remote Note a like targets — a remote post (content) or a remote comment (addon) — or null. */
+    private static function likeTarget($like): ?array
+    {
+        $addonId = $like->content_addon_record_id;
+        if ($addonId instanceof \yii\db\Expression) {
+            $addonId = null; // freshly-saved post-like carries Expression('NULL'), not real null
+        }
+        $resolver = new RemoteTargetResolver();
+        if (empty($addonId)) {
+            return $resolver->resolve((int) $like->content_id); // like on a post
+        }
+        // A like on an addon (e.g. a comment): content_addon_record_id is a RecordMap
+        // id, NOT the addon's primary key — resolve it to the real record first.
+        $addon = RecordMap::getById((int) $addonId, ContentOwner::class);
+        if (!$addon instanceof Comment) {
+            return null; // only comment-likes are federated
+        }
+        return $resolver->resolveComment((int) $addon->id);
+    }
+
+    /** Local user liked a remote post or remote comment → send Like to its author. */
     public static function onLikeCreated($event): void
     {
         $like = $event->sender;
-        // A like on a post has content_addon_record_id NULL; a like on a comment has it set.
-        // A freshly-saved like carries an Expression('NULL') in memory (set by LikeService)
-        // rather than a real null until the record is reloaded, so treat that as "no addon" too.
-        $addonId = $like->content_addon_record_id;
-        if ($addonId instanceof \yii\db\Expression) {
-            $addonId = null;
-        }
-        if (!empty($addonId)) {
-            return; // likes on comments are out of scope this phase
-        }
         $actor = self::federatableActor((int) $like->created_by);
         if ($actor === null) {
             return; // not a local federatable user (shadow user or non-discoverable)
         }
-        $target = (new RemoteTargetResolver())->resolve((int) $like->content_id);
+        $target = self::likeTarget($like);
         if ($target === null) {
-            return; // not a remote-origin post
+            return; // not a like on a remote post or remote comment
         }
 
         $likeApId = $actor->ap_id . '/likes/' . bin2hex(random_bytes(8));
@@ -286,52 +298,30 @@ class Events
         ]));
     }
 
-    /** Local user commented on a remote-origin post → send Create{Note, inReplyTo}. */
+    /** Local comment → federate it: reply to a remote comment, reply to a remote post, or fan out on a local federated post. */
     public static function onCommentCreated($event): void
     {
         $comment = $event->sender;
-        if (!empty($comment->parent_comment_id)) {
-            return; // reply to a comment, not the post — inReplyTo would be wrong; out of scope this phase
-        }
         $actor = self::federatableActor((int) $comment->created_by);
         if ($actor === null) {
             return; // shadow user (inbound comment — loop guard) or non-federatable
         }
+
+        if (!empty($comment->parent_comment_id)) {
+            // Reply to a comment → federate only if the parent is a remote comment.
+            $target = (new RemoteTargetResolver())->resolveComment((int) $comment->parent_comment_id);
+            if ($target !== null) {
+                self::sendReplyToRemote($comment, $actor, $target);
+            }
+            return; // replies to local comments are out of scope
+        }
+
         $target = (new RemoteTargetResolver())->resolve((int) $comment->content_id);
         if ($target === null) {
             self::federateReplyToLocalPost($comment, $actor);
             return;
         }
-
-        $noteApId = $actor->ap_id . '/comments/' . (int) $comment->id;
-        self::recordObject($noteApId, 'Note', Comment::class, (int) $comment->id);
-
-        $published = date('c', strtotime((string) $comment->created_at));
-        $note = [
-            'id' => $noteApId,
-            'type' => 'Note',
-            'attributedTo' => $actor->ap_id,
-            'content' => RichText::output((string) $comment->message),
-            'inReplyTo' => $target['noteApId'],
-            'published' => $published,
-            'to' => [$target['remote']->ap_id],
-            'cc' => ['https://www.w3.org/ns/activitystreams#Public'],
-        ];
-        $create = [
-            '@context' => 'https://www.w3.org/ns/activitystreams',
-            'id' => $noteApId . '/activity',
-            'type' => 'Create',
-            'actor' => $actor->ap_id,
-            'published' => $published,
-            'to' => [$target['remote']->ap_id],
-            'cc' => ['https://www.w3.org/ns/activitystreams#Public'],
-            'object' => $note,
-        ];
-        Yii::$app->queue->push(new DeliverToInbox([
-            'signerUserId' => (int) $comment->created_by,
-            'inboxUrl' => $target['remote']->inbox_url,
-            'activityJson' => json_encode($create, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-        ]));
+        self::sendReplyToRemote($comment, $actor, $target);
     }
 
     /** Local user's display name changed → Update{Person} to their remote followers. */
@@ -371,6 +361,40 @@ class Events
         Yii::$app->queue->push(new DeliverActivity([
             'localUserId' => (int) $user->id,
             'activityJson' => json_encode($activity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ]));
+    }
+
+    /** Deliver $comment as a Create{Note, inReplyTo: $target Note} to the remote author in $target. */
+    private static function sendReplyToRemote($comment, LocalActor $actor, array $target): void
+    {
+        $noteApId = $actor->ap_id . '/comments/' . (int) $comment->id;
+        self::recordObject($noteApId, 'Note', Comment::class, (int) $comment->id);
+
+        $published = date('c', strtotime((string) $comment->created_at));
+        $note = [
+            'id' => $noteApId,
+            'type' => 'Note',
+            'attributedTo' => $actor->ap_id,
+            'content' => RichText::output((string) $comment->message),
+            'inReplyTo' => $target['noteApId'],
+            'published' => $published,
+            'to' => [$target['remote']->ap_id],
+            'cc' => ['https://www.w3.org/ns/activitystreams#Public'],
+        ];
+        $create = [
+            '@context' => 'https://www.w3.org/ns/activitystreams',
+            'id' => $noteApId . '/activity',
+            'type' => 'Create',
+            'actor' => $actor->ap_id,
+            'published' => $published,
+            'to' => [$target['remote']->ap_id],
+            'cc' => ['https://www.w3.org/ns/activitystreams#Public'],
+            'object' => $note,
+        ];
+        Yii::$app->queue->push(new DeliverToInbox([
+            'signerUserId' => (int) $comment->created_by,
+            'inboxUrl' => $target['remote']->inbox_url,
+            'activityJson' => json_encode($create, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         ]));
     }
 
@@ -429,7 +453,7 @@ class Events
         ]));
     }
 
-    /** Local user removed a like on a remote post → send Undo{Like}. */
+    /** Local user removed a like on a remote post or comment → send Undo{Like}. */
     public static function onLikeRemoved($event): void
     {
         $like = $event->sender;
@@ -443,7 +467,7 @@ class Events
             return; // this like was never federated
         }
         $signer = LocalActor::findOne(['user_id' => (int) $like->created_by]);
-        $target = (new RemoteTargetResolver())->resolve((int) $like->content_id);
+        $target = self::likeTarget($like);
         if ($signer !== null && $target !== null) {
             $undo = [
                 '@context' => 'https://www.w3.org/ns/activitystreams',

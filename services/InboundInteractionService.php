@@ -2,7 +2,10 @@
 
 namespace humhub\modules\fediverse\services;
 
+use humhub\models\RecordMap;
 use humhub\modules\comment\models\Comment;
+use humhub\modules\content\components\ContentAddonActiveRecord;
+use humhub\modules\content\interfaces\ContentProvider;
 use humhub\modules\content\models\Content;
 use humhub\modules\fediverse\models\FederationObject;
 use humhub\modules\like\models\Like;
@@ -43,23 +46,26 @@ class InboundInteractionService
         $this->record($noteApId, 'Note', Comment::class, $comment->id);
     }
 
-    /** Add a like by the remote user on the given content (idempotent). */
-    public function addLike(Content $content, User $author, string $likeApId): void
+    /** Add a like by the remote user on the given record — a post or a comment (idempotent). */
+    public function addLike(ContentProvider $record, User $author, string $likeApId): void
     {
         if ($likeApId !== '' && FederationObject::find()->where(['ap_id' => $likeApId])->exists()) {
             return;
         }
+        // For an addon (e.g. a comment) the like's content_addon_record_id is the
+        // addon's RecordMap id, not its primary key; for the content itself it is null.
+        $addonRecordId = $record instanceof ContentAddonActiveRecord ? RecordMap::getId($record) : null;
         $exists = Like::find()
-            ->where(['content_id' => $content->id, 'created_by' => $author->id, 'content_addon_record_id' => null])
+            ->where(['content_id' => $record->content->id, 'created_by' => $author->id, 'content_addon_record_id' => $addonRecordId])
             ->exists();
         if ($exists) {
             return;
         }
 
         $like = new Like();
-        $like->content_id = $content->id;
-        $like->content_addon_record_id = null; // liking the content itself, not an addon
-        $like->created_by = $author->id;
+        $like->content_id = $record->content->id;
+        $like->content_addon_record_id = $addonRecordId;
+        $like->created_by = $author->id; // explicit: the queue has no logged-in user
         try {
             if (!$like->save()) {
                 Yii::warning('Fediverse inbound like save failed: ' . implode(', ', $like->getErrorSummary(true)), 'fediverse');
@@ -74,11 +80,12 @@ class InboundInteractionService
         }
     }
 
-    /** Remove the remote user's like from the given content. */
-    public function removeLike(Content $content, User $author): void
+    /** Remove the remote user's like from the given record (post or comment). */
+    public function removeLike(ContentProvider $record, User $author): void
     {
+        $addonRecordId = $record instanceof ContentAddonActiveRecord ? RecordMap::getId($record) : null;
         $like = Like::find()
-            ->where(['content_id' => $content->id, 'created_by' => $author->id, 'content_addon_record_id' => null])
+            ->where(['content_id' => $record->content->id, 'created_by' => $author->id, 'content_addon_record_id' => $addonRecordId])
             ->one();
         if ($like !== null) {
             $like->delete();

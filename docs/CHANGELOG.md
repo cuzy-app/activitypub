@@ -31,6 +31,9 @@
 - Enh: Threading — a local comment on a local federated post is delivered as a
   `Create{Note, inReplyTo}` to the post author's remote followers (signed by the
   commenter), so replies stay threaded on Mastodon.
+- Enh: Comment-level federation — local likes/replies on remote comments are sent
+  to the comment's author, and remote likes on local comments are recorded on the
+  comment (not the post).
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

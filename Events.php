@@ -248,7 +248,14 @@ class Events
     public static function onLikeCreated($event): void
     {
         $like = $event->sender;
-        if (!empty($like->content_addon_record_id)) {
+        // A like on a post has content_addon_record_id NULL; a like on a comment has it set.
+        // A freshly-saved like carries an Expression('NULL') in memory (set by LikeService)
+        // rather than a real null until the record is reloaded, so treat that as "no addon" too.
+        $addonId = $like->content_addon_record_id;
+        if ($addonId instanceof \yii\db\Expression) {
+            $addonId = null;
+        }
+        if (!empty($addonId)) {
             return; // likes on comments are out of scope this phase
         }
         $actor = self::federatableActor((int) $like->created_by);

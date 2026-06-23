@@ -21,6 +21,10 @@
 - Enh: Local → remote — follow a Fediverse account by `@user@domain` (WebFinger),
   outbound signed `Follow`/`Undo` with `Accept` handling, and ingest of the
   followed account's public posts into the follower's dashboard.
+- Enh: Outbound interactions — liking or commenting on a remote account's
+  ingested post sends a signed `Like` / `Create{Note, inReplyTo}` back to the
+  author (and `Undo{Like}` on unlike); inbound interactions are loop-guarded so
+  they are never re-federated.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

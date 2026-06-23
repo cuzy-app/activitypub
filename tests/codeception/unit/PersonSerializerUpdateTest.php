@@ -22,4 +22,22 @@ class PersonSerializerUpdateTest extends HumHubDbTestCase
         $this->assertContains('https://www.w3.org/ns/activitystreams#Public', $activity['to']);
         $this->assertContains('https://www.w3.org/ns/activitystreams', $activity['@context']);
     }
+
+    public function testSerializeIncludesSummaryAndIconWhenProvided()
+    {
+        $actor = new LocalActor();
+        $actor->ap_id = 'https://test.fedihub.social/fediverse/actor/abc';
+        $actor->type = 'Person';
+        $actor->preferred_username = 'abc';
+        $actor->public_key = 'KEY';
+
+        $icon = ['type' => 'Image', 'url' => 'https://test.fedihub.social/a.jpg'];
+        $doc = (new PersonSerializer())->serialize($actor, 'Name', 'https://test.fedihub.social/u/abc', '<p>bio</p>', $icon);
+        $this->assertSame('<p>bio</p>', $doc['summary']);
+        $this->assertSame($icon, $doc['icon']);
+
+        $bare = (new PersonSerializer())->serialize($actor, 'Name', 'https://test.fedihub.social/u/abc');
+        $this->assertArrayNotHasKey('summary', $bare);
+        $this->assertArrayNotHasKey('icon', $bare);
+    }
 }

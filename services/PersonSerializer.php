@@ -2,7 +2,9 @@
 
 namespace humhub\modules\fediverse\services;
 
+use humhub\modules\content\widgets\richtext\RichText;
 use humhub\modules\fediverse\models\LocalActor;
+use humhub\modules\user\models\User;
 
 /**
  * Renders a LocalActor into an ActivityPub actor document (Person or
@@ -15,12 +17,14 @@ class PersonSerializer
      * @param LocalActor $actor the local actor (its `type` selects Person/Application)
      * @param string $name human-readable display name
      * @param string $profileUrl absolute HTML profile URL
+     * @param string|null $summary optional HTML bio (Person actors only)
+     * @param array|null $icon optional avatar image object (Person actors only)
      */
-    public function serialize(LocalActor $actor, string $name, string $profileUrl): array
+    public function serialize(LocalActor $actor, string $name, string $profileUrl, ?string $summary = null, ?array $icon = null): array
     {
         $id = $actor->ap_id;
 
-        return [
+        $doc = [
             '@context' => [
                 'https://www.w3.org/ns/activitystreams',
                 'https://w3id.org/security/v1',
@@ -42,6 +46,29 @@ class PersonSerializer
                 'owner' => $id,
                 'publicKeyPem' => $actor->public_key,
             ],
+        ];
+        if ($summary !== null && $summary !== '') {
+            $doc['summary'] = $summary;
+        }
+        if ($icon !== null) {
+            $doc['icon'] = $icon;
+        }
+        return $doc;
+    }
+
+    /**
+     * Derive a user's actor-document extras: bio (summary) and avatar (icon).
+     * `summary` is null when the user has no bio. Call from contexts with a
+     * request (web), so the avatar URL resolves to an absolute https URL.
+     *
+     * @return array{summary:?string,icon:array}
+     */
+    public static function profileExtras(User $user): array
+    {
+        $about = trim((string) ($user->profile?->about ?? ''));
+        return [
+            'summary' => $about !== '' ? RichText::output($about) : null,
+            'icon' => ['type' => 'Image', 'url' => $user->getProfileImage()->getUrl(null, true)],
         ];
     }
 

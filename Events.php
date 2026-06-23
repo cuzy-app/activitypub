@@ -332,8 +332,10 @@ class Events
             return;
         }
         $changed = $event->changedAttributes ?? [];
-        if (!array_key_exists('firstname', $changed) && !array_key_exists('lastname', $changed)) {
-            return; // display name (first/last) unchanged
+        if (!array_key_exists('firstname', $changed)
+            && !array_key_exists('lastname', $changed)
+            && !array_key_exists('about', $changed)) {
+            return; // nothing federatable changed (name or bio)
         }
 
         $user = $profile->user;
@@ -355,7 +357,8 @@ class Events
         }
 
         $serializer = new PersonSerializer();
-        $document = $serializer->serialize($actor, $user->displayName, $user->getUrl(true));
+        $extras = PersonSerializer::profileExtras($user);
+        $document = $serializer->serialize($actor, $user->displayName, $user->getUrl(true), $extras['summary'], $extras['icon']);
         $activity = $serializer->updateActivity($actor, $document, $actor->ap_id . '#updates/' . bin2hex(random_bytes(8)));
 
         Yii::$app->queue->push(new DeliverActivity([

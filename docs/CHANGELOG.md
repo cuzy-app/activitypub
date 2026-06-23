@@ -25,9 +25,9 @@
   ingested post sends a signed `Like` / `Create{Note, inReplyTo}` back to the
   author (and `Undo{Like}` on unlike); inbound interactions are loop-guarded so
   they are never re-federated.
-- Enh: Profile sync — a local user's display-name change is federated to their
-  remote followers as a signed `Update{Person}`, so Mastodon refreshes the
-  cached name.
+- Enh: Profile sync — the actor document carries the user's avatar (`icon`) and
+  bio (`summary`), and a display-name or bio change is federated to remote
+  followers as a signed `Update{Person}`, so Mastodon refreshes the cached profile.
 - Enh: Threading — a local comment on a local federated post is delivered as a
   `Create{Note, inReplyTo}` to the post author's remote followers (signed by the
   commenter), so replies stay threaded on Mastodon.

@@ -2,9 +2,12 @@
 
 namespace humhub\modules\fediverse\jobs;
 
+use humhub\modules\comment\models\Comment;
 use humhub\modules\fediverse\models\FederationFollow;
+use humhub\modules\fediverse\models\FederationObject;
 use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\models\RemoteActor;
+use humhub\modules\post\models\Post;
 use humhub\modules\fediverse\services\ActivityDelivery;
 use humhub\modules\fediverse\services\InboundInteractionService;
 use humhub\modules\fediverse\services\LocalObjectResolver;
@@ -62,6 +65,12 @@ class ProcessInboxActivity extends ActiveJob
                 break;
             case 'Accept':
                 $this->handleAccept($activity, $remote);
+                break;
+            case 'Delete':
+                $this->handleDelete($activity, $remote);
+                break;
+            case 'Update':
+                $this->handleUpdate($activity, $remote);
                 break;
             default:
                 Yii::info('Fediverse inbox: ignoring unsupported type ' . $activity['type'], 'fediverse');
@@ -227,6 +236,80 @@ class ProcessInboxActivity extends ActiveJob
             (string) ($object['content'] ?? ''),
             (string) ($object['id'] ?? '')
         );
+    }
+
+    /** Inbound Delete{Note|Tombstone} → soft-delete the ingested remote post/comment (author only). */
+    private function handleDelete(array $activity, RemoteActor $remote): void
+    {
+        $apId = $this->objectId($activity['object'] ?? null);
+        $record = $this->resolveRemoteRecord($apId);
+        if ($record === null) {
+            return; // not something we ingested
+        }
+        if (!$this->isAuthoredBy($record, $remote)) {
+            Yii::warning('Fediverse Delete: actor is not the author of the target ' . $apId, 'fediverse');
+            return;
+        }
+        try {
+            $record->delete();
+        } catch (\Throwable $e) {
+            Yii::warning('Fediverse Delete failed for ' . $apId . ': ' . $e->getMessage(), 'fediverse');
+            return;
+        }
+        FederationObject::deleteAll(['ap_id' => $apId, 'direction' => FederationObject::DIRECTION_REMOTE]);
+    }
+
+    /** Inbound Update{Note} → update the ingested remote post/comment content (author only). */
+    private function handleUpdate(array $activity, RemoteActor $remote): void
+    {
+        $object = $activity['object'] ?? null;
+        if (!is_array($object) || ($object['type'] ?? '') !== 'Note') {
+            return; // Update{Person} and other types are out of scope here
+        }
+        $record = $this->resolveRemoteRecord((string) ($object['id'] ?? ''));
+        if ($record === null) {
+            return;
+        }
+        if (!$this->isAuthoredBy($record, $remote)) {
+            Yii::warning('Fediverse Update: actor is not the author of the target', 'fediverse');
+            return;
+        }
+        $record->message = trim(strip_tags((string) ($object['content'] ?? '')));
+        try {
+            if (!$record->save()) {
+                Yii::warning('Fediverse Update save failed: ' . implode(', ', $record->getErrorSummary(true)), 'fediverse');
+            }
+        } catch (\Throwable $e) {
+            Yii::warning('Fediverse Update error: ' . $e->getMessage(), 'fediverse');
+        }
+    }
+
+    /** Resolve a remote-origin AP object id to the ingested local record (Post or Comment), or null. */
+    private function resolveRemoteRecord(string $apId)
+    {
+        if ($apId === '') {
+            return null;
+        }
+        $obj = FederationObject::findOne(['ap_id' => $apId, 'direction' => FederationObject::DIRECTION_REMOTE]);
+        if ($obj === null || $obj->model_class === null || $obj->model_id === null) {
+            return null;
+        }
+        if (!class_exists($obj->model_class) || !method_exists($obj->model_class, 'findOne')) {
+            return null;
+        }
+        return $obj->model_class::findOne($obj->model_id);
+    }
+
+    /** True if the verified remote actor is the author of the ingested record. */
+    private function isAuthoredBy($record, RemoteActor $remote): bool
+    {
+        if ($record instanceof Post) {
+            return (int) ($record->content->created_by ?? 0) === (int) $remote->user_id;
+        }
+        if ($record instanceof Comment) {
+            return (int) $record->created_by === (int) $remote->user_id;
+        }
+        return false;
     }
 
     /** Inbound Like → like the referenced local content. */

@@ -37,6 +37,9 @@
 - Fix: Federated content (posts, comments, bios) is rendered to clean HTML —
   Markdown becomes real markup (bold/links) and emoji become Unicode — instead of
   raw markdown wrapped in editor-widget HTML that remote servers showed verbatim.
+- Enh: Inbound edits & deletes — when a remote account deletes or edits a post or
+  comment we ingested, it is reflected locally (soft-delete or updated text),
+  authorized to the content's author.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

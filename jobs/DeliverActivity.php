@@ -17,11 +17,15 @@ use Yii;
 class DeliverActivity extends ActiveJob
 {
     public int $localUserId = 0;
+    public int $signerUserId = 0;
     public string $activityJson = '';
 
     public function run()
     {
-        $signer = LocalActor::findOne(['user_id' => $this->localUserId]);
+        // The signer may differ from the follower-set owner (e.g. user B replies on
+        // user A's post → sign as B, but fan out to A's followers).
+        $signerUserId = $this->signerUserId ?: $this->localUserId;
+        $signer = LocalActor::findOne(['user_id' => $signerUserId]);
         $activity = json_decode($this->activityJson, true);
         if ($signer === null || !is_array($activity)) {
             return;

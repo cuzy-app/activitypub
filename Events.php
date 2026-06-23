@@ -299,7 +299,8 @@ class Events
         }
         $target = (new RemoteTargetResolver())->resolve((int) $comment->content_id);
         if ($target === null) {
-            return; // not a reply to a remote-origin post
+            self::federateReplyToLocalPost($comment, $actor);
+            return;
         }
 
         $noteApId = $actor->ap_id . '/comments/' . (int) $comment->id;
@@ -370,6 +371,61 @@ class Events
         Yii::$app->queue->push(new DeliverActivity([
             'localUserId' => (int) $user->id,
             'activityJson' => json_encode($activity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ]));
+    }
+
+    /** A top-level comment on a LOCAL federated post → fan the reply out to the post author's remote followers. */
+    private static function federateReplyToLocalPost($comment, LocalActor $actor): void
+    {
+        $content = Content::findOne((int) $comment->content_id);
+        if ($content === null) {
+            return;
+        }
+        $record = $content->getPolymorphicRelation();
+        if (!$record instanceof Post) {
+            return;
+        }
+        $postNoteId = self::existingNoteId(Post::class, (int) $record->id);
+        if ($postNoteId === null) {
+            return; // the post was never federated → no remote followers saw it
+        }
+        $postAuthor = $content->createdBy;
+        if ($postAuthor === null) {
+            return;
+        }
+        $authorActor = LocalActor::findOne(['user_id' => $postAuthor->id]);
+        if ($authorActor === null) {
+            return;
+        }
+
+        $noteApId = $actor->ap_id . '/comments/' . (int) $comment->id;
+        self::recordObject($noteApId, 'Note', Comment::class, (int) $comment->id);
+
+        $published = date('c', strtotime((string) $comment->created_at));
+        $note = [
+            'id' => $noteApId,
+            'type' => 'Note',
+            'attributedTo' => $actor->ap_id,
+            'content' => RichText::output((string) $comment->message),
+            'inReplyTo' => $postNoteId,
+            'published' => $published,
+            'to' => [$authorActor->ap_id],
+            'cc' => ['https://www.w3.org/ns/activitystreams#Public'],
+        ];
+        $create = [
+            '@context' => 'https://www.w3.org/ns/activitystreams',
+            'id' => $noteApId . '/activity',
+            'type' => 'Create',
+            'actor' => $actor->ap_id,
+            'published' => $published,
+            'to' => [$authorActor->ap_id],
+            'cc' => ['https://www.w3.org/ns/activitystreams#Public'],
+            'object' => $note,
+        ];
+        Yii::$app->queue->push(new DeliverActivity([
+            'localUserId' => (int) $postAuthor->id,        // deliver to the post author's followers
+            'signerUserId' => (int) $comment->created_by,  // signed by the commenter
+            'activityJson' => json_encode($create, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         ]));
     }
 

@@ -28,6 +28,9 @@
 - Enh: Profile sync — a local user's display-name change is federated to their
   remote followers as a signed `Update{Person}`, so Mastodon refreshes the
   cached name.
+- Enh: Threading — a local comment on a local federated post is delivered as a
+  `Create{Note, inReplyTo}` to the post author's remote followers (signed by the
+  commenter), so replies stay threaded on Mastodon.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

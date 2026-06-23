@@ -14,6 +14,8 @@ use humhub\modules\fediverse\models\RemoteActor;
 use humhub\modules\fediverse\services\DiscoveryPolicy;
 use humhub\modules\fediverse\services\FederationContentPolicy;
 use humhub\modules\fediverse\services\FederationUrl;
+use humhub\modules\fediverse\services\RemoteTargetResolver;
+use humhub\modules\like\models\Like;
 use humhub\modules\fediverse\services\KeyManager;
 use humhub\modules\fediverse\services\NoteSerializer;
 use humhub\modules\post\models\Post;
@@ -108,6 +110,22 @@ class Events
         $obj->model_class = $modelClass;
         $obj->model_id = $modelId;
         $obj->save();
+    }
+
+    /** A LocalActor for a user that may federate as an actor, or null (shadow user / not discoverable). */
+    private static function federatableActor(int $userId): ?LocalActor
+    {
+        $user = User::findOne($userId);
+        if ($user === null) {
+            return null;
+        }
+        if (RemoteActor::findOne(['user_id' => $user->id]) !== null) {
+            return null; // a federated shadow user — its actions are inbound, never re-federated (loop guard)
+        }
+        if (!DiscoveryPolicy::isDiscoverable($user)) {
+            return null; // no fetchable actor → remote can't verify; skip
+        }
+        return (new KeyManager())->getOrCreateForUser($user);
     }
 
     private static function existingNoteId(string $modelClass, int $modelId): ?string
@@ -223,5 +241,75 @@ class Events
             ]));
         }
         $follow->delete();
+    }
+
+    /** Local user liked a remote-origin post → send Like to the remote author. */
+    public static function onLikeCreated($event): void
+    {
+        $like = $event->sender;
+        if (!empty($like->content_addon_record_id)) {
+            return; // likes on comments are out of scope this phase
+        }
+        $actor = self::federatableActor((int) $like->created_by);
+        if ($actor === null) {
+            return; // not a local federatable user (shadow user or non-discoverable)
+        }
+        $target = (new RemoteTargetResolver())->resolve((int) $like->content_id);
+        if ($target === null) {
+            return; // not a remote-origin post
+        }
+
+        $likeApId = $actor->ap_id . '/likes/' . bin2hex(random_bytes(8));
+        self::recordObject($likeApId, 'Like', Like::class, (int) $like->id);
+
+        $activity = [
+            '@context' => 'https://www.w3.org/ns/activitystreams',
+            'id' => $likeApId,
+            'type' => 'Like',
+            'actor' => $actor->ap_id,
+            'object' => $target['noteApId'],
+        ];
+        Yii::$app->queue->push(new DeliverToInbox([
+            'signerUserId' => (int) $like->created_by,
+            'inboxUrl' => $target['remote']->inbox_url,
+            'activityJson' => json_encode($activity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ]));
+    }
+
+    /** Local user removed a like on a remote post → send Undo{Like}. */
+    public static function onLikeRemoved($event): void
+    {
+        $like = $event->sender;
+        $obj = FederationObject::findOne([
+            'model_class' => Like::class,
+            'model_id' => (int) $like->id,
+            'direction' => FederationObject::DIRECTION_LOCAL,
+            'object_type' => 'Like',
+        ]);
+        if ($obj === null) {
+            return; // this like was never federated
+        }
+        $signer = LocalActor::findOne(['user_id' => (int) $like->created_by]);
+        $target = (new RemoteTargetResolver())->resolve((int) $like->content_id);
+        if ($signer !== null && $target !== null) {
+            $undo = [
+                '@context' => 'https://www.w3.org/ns/activitystreams',
+                'id' => $signer->ap_id . '/undos/' . bin2hex(random_bytes(8)),
+                'type' => 'Undo',
+                'actor' => $signer->ap_id,
+                'object' => [
+                    'id' => $obj->ap_id,
+                    'type' => 'Like',
+                    'actor' => $signer->ap_id,
+                    'object' => $target['noteApId'],
+                ],
+            ];
+            Yii::$app->queue->push(new DeliverToInbox([
+                'signerUserId' => (int) $like->created_by,
+                'inboxUrl' => $target['remote']->inbox_url,
+                'activityJson' => json_encode($undo, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            ]));
+        }
+        $obj->delete();
     }
 }

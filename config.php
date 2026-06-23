@@ -9,6 +9,8 @@ return [
         ['class' => 'humhub\modules\post\models\Post', 'event' => 'afterSoftDelete', 'callback' => ['humhub\modules\fediverse\Events', 'onContentDeleted']],
         ['class' => 'humhub\modules\user\models\Follow', 'event' => 'followCreated', 'callback' => ['humhub\modules\fediverse\Events', 'onFollowCreated']],
         ['class' => 'humhub\modules\user\models\Follow', 'event' => 'followRemoved', 'callback' => ['humhub\modules\fediverse\Events', 'onFollowRemoved']],
+        ['class' => 'humhub\modules\like\models\Like', 'event' => 'afterInsert', 'callback' => ['humhub\modules\fediverse\Events', 'onLikeCreated']],
+        ['class' => 'humhub\modules\like\models\Like', 'event' => 'beforeDelete', 'callback' => ['humhub\modules\fediverse\Events', 'onLikeRemoved']],
     ],
     'consoleControllerMap' => [
         'fediverse' => 'humhub\modules\fediverse\commands\FediverseController',

@@ -17,10 +17,12 @@ use humhub\modules\fediverse\services\FederationContentPolicy;
 use humhub\modules\fediverse\services\FederationUrl;
 use humhub\modules\fediverse\services\KeyManager;
 use humhub\modules\fediverse\services\NoteSerializer;
+use humhub\modules\fediverse\services\PersonSerializer;
 use humhub\modules\fediverse\services\RemoteTargetResolver;
 use humhub\modules\like\models\Like;
 use humhub\modules\post\models\Post;
 use humhub\modules\user\events\FollowEvent;
+use humhub\modules\user\models\Profile;
 use humhub\modules\user\models\User;
 use Yii;
 
@@ -328,6 +330,46 @@ class Events
             'signerUserId' => (int) $comment->created_by,
             'inboxUrl' => $target['remote']->inbox_url,
             'activityJson' => json_encode($create, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ]));
+    }
+
+    /** Local user's display name changed → Update{Person} to their remote followers. */
+    public static function onProfileUpdated($event): void
+    {
+        $profile = $event->sender;
+        if (!$profile instanceof Profile) {
+            return;
+        }
+        $changed = $event->changedAttributes ?? [];
+        if (!array_key_exists('firstname', $changed) && !array_key_exists('lastname', $changed)) {
+            return; // display name (first/last) unchanged
+        }
+
+        $user = $profile->user;
+        if ($user === null) {
+            return;
+        }
+        $actor = self::federatableActor((int) $user->id);
+        if ($actor === null) {
+            return; // shadow user (loop guard) or not federatable
+        }
+
+        $hasFollowers = FederationFollow::find()->where([
+            'local_user_id' => $user->id,
+            'direction' => FederationFollow::DIRECTION_INBOUND,
+            'state' => FederationFollow::STATE_ACCEPTED,
+        ])->exists();
+        if (!$hasFollowers) {
+            return; // nobody to notify
+        }
+
+        $serializer = new PersonSerializer();
+        $document = $serializer->serialize($actor, $user->displayName, $user->getUrl(true));
+        $activity = $serializer->updateActivity($actor, $document, $actor->ap_id . '#updates/' . bin2hex(random_bytes(8)));
+
+        Yii::$app->queue->push(new DeliverActivity([
+            'localUserId' => (int) $user->id,
+            'activityJson' => json_encode($activity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         ]));
     }
 

@@ -12,6 +12,7 @@ return [
         ['class' => 'humhub\modules\like\models\Like', 'event' => 'afterInsert', 'callback' => ['humhub\modules\fediverse\Events', 'onLikeCreated']],
         ['class' => 'humhub\modules\like\models\Like', 'event' => 'beforeDelete', 'callback' => ['humhub\modules\fediverse\Events', 'onLikeRemoved']],
         ['class' => 'humhub\modules\comment\models\Comment', 'event' => 'afterInsert', 'callback' => ['humhub\modules\fediverse\Events', 'onCommentCreated']],
+        ['class' => 'humhub\modules\user\models\Profile', 'event' => 'afterUpdate', 'callback' => ['humhub\modules\fediverse\Events', 'onProfileUpdated']],
     ],
     'consoleControllerMap' => [
         'fediverse' => 'humhub\modules\fediverse\commands\FediverseController',

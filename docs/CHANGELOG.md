@@ -25,6 +25,9 @@
   ingested post sends a signed `Like` / `Create{Note, inReplyTo}` back to the
   author (and `Undo{Like}` on unlike); inbound interactions are loop-guarded so
   they are never re-federated.
+- Enh: Profile sync — a local user's display-name change is federated to their
+  remote followers as a signed `Update{Person}`, so Mastodon refreshes the
+  cached name.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

@@ -2,6 +2,7 @@
 
 namespace humhub\modules\fediverse;
 
+use humhub\modules\comment\models\Comment;
 use humhub\modules\content\events\ContentStateEvent;
 use humhub\modules\content\models\Content;
 use humhub\modules\content\widgets\richtext\RichText;
@@ -14,11 +15,10 @@ use humhub\modules\fediverse\models\RemoteActor;
 use humhub\modules\fediverse\services\DiscoveryPolicy;
 use humhub\modules\fediverse\services\FederationContentPolicy;
 use humhub\modules\fediverse\services\FederationUrl;
-use humhub\modules\fediverse\services\RemoteTargetResolver;
-use humhub\modules\comment\models\Comment;
-use humhub\modules\like\models\Like;
 use humhub\modules\fediverse\services\KeyManager;
 use humhub\modules\fediverse\services\NoteSerializer;
+use humhub\modules\fediverse\services\RemoteTargetResolver;
+use humhub\modules\like\models\Like;
 use humhub\modules\post\models\Post;
 use humhub\modules\user\events\FollowEvent;
 use humhub\modules\user\models\User;

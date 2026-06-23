@@ -45,6 +45,12 @@
   file attachments, and an inbound `Update{Person}` refreshes a remote user's
   name, bio, avatar and banner. Downloads are SSRF-guarded, HTTPS-only, restricted
   to raster image types, and size-capped.
+- Enh: Federated users are first-class — a dedicated `fediverse` `UserSource`
+  governs them (synced profile read-only, no self-delete, no email required),
+  their username is their `@user@domain` handle, and they no longer carry a
+  synthetic email. The `fediverse/migrate-shadow-users` console command brings
+  existing federated users onto this model and backfills avatar/banner/bio.
+  (Requires the core per-source optional-email change, HumHub PR #8239.)
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

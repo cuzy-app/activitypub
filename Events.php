@@ -15,6 +15,7 @@ use humhub\modules\fediverse\models\FederationObject;
 use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\models\RemoteActor;
 use humhub\modules\fediverse\services\DiscoveryPolicy;
+use humhub\modules\fediverse\services\FederatedUserSource;
 use humhub\modules\fediverse\services\FederationContentPolicy;
 use humhub\modules\fediverse\services\FederationUrl;
 use humhub\modules\fediverse\services\KeyManager;
@@ -454,6 +455,12 @@ class Events
             'signerUserId' => (int) $comment->created_by,  // signed by the commenter
             'activityJson' => json_encode($create, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         ]));
+    }
+
+    /** Register the Fediverse UserSource so it governs federated shadow users. */
+    public static function onUserSourceCollectionSet($event): void
+    {
+        $event->parameters['userSources'][FederatedUserSource::ID] = ['class' => FederatedUserSource::class];
     }
 
     /** Local user removed a like on a remote post or comment → send Undo{Like}. */

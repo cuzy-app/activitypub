@@ -91,8 +91,9 @@ class RemoteActorResolver
         $name = trim((string) ($doc['name'] ?? '')) ?: $preferred;
 
         $user = new User();
-        $user->username = $this->uniqueUsername($preferred . '@' . $domain);
-        $user->email = 'remote-' . substr(sha1($actorUrl), 0, 20) . '@federated.invalid';
+        $user->user_source = FederatedUserSource::ID; // governs: email optional, no self-delete, managed attrs
+        $user->username = $this->uniqueUsername('@' . $preferred . '@' . $domain);
+        $user->email = null; // FederatedUserSource declares email optional (core PR #8239)
         $user->status = User::STATUS_ENABLED;
         $user->visibility = User::VISIBILITY_REGISTERED_ONLY; // followable + profile-viewable, off public discovery
 
@@ -162,10 +163,12 @@ class RemoteActorResolver
 
     private function uniqueUsername(string $base): string
     {
-        $candidate = mb_substr($base, 0, 97);
+        $max = (int) (Yii::$app->getModule('user')->maximumUsernameLength ?: 50);
+        $candidate = mb_substr($base, 0, $max);
         $i = 1;
         while (User::find()->where(['username' => $candidate])->exists()) {
-            $candidate = mb_substr($base, 0, 90) . '_' . $i;
+            $suffix = '_' . $i;
+            $candidate = mb_substr($base, 0, $max - mb_strlen($suffix)) . $suffix;
             $i++;
         }
         return $candidate;

@@ -458,6 +458,29 @@ class Events
         Yii::$app->queue->push(new RefreshRemoteActor(['remoteActorId' => (int) $remote->id]));
     }
 
+    /** Remote profiles: drop the meaningless local-graph sidebar panels and add the remote-account panel. */
+    public static function onProfileSidebarInit($event): void
+    {
+        $sidebar = $event->sender;
+        $user = $sidebar->user ?? null;
+        if (!$user instanceof User || RemoteActor::findOne(['user_id' => $user->id]) === null) {
+            return;
+        }
+        $sidebar->removeWidget('humhub\modules\user\widgets\UserSpaces');
+        $sidebar->removeWidget('humhub\modules\user\widgets\UserFollower');
+        $sidebar->removeWidget('humhub\modules\friendship\widgets\FriendsPanel');
+        $sidebar->addWidget('humhub\modules\fediverse\widgets\RemoteAccountInfo', ['user' => $user], ['sortOrder' => 5]);
+    }
+
+    /** Hide the "Add Friend" button on remote profiles (a request to a login-disabled shadow user is pointless). */
+    public static function onFriendshipButton($event): void
+    {
+        $user = $event->sender->user ?? null;
+        if ($user instanceof User && RemoteActor::findOne(['user_id' => $user->id]) !== null) {
+            $event->isValid = false;
+        }
+    }
+
     /** Build + fan out an Update{Person} for a local user (no-op if not federatable or has no followers). */
     private static function sendActorUpdate(User $user): void
     {

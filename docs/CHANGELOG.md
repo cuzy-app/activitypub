@@ -85,6 +85,10 @@
   are processed without minting an empty user. A new
   `fediverse/prune-remote-actors` console command removes the orphan shadow users
   accumulated before this fix (no follow and no like/comment/post).
+- Enh: A remote user's profile drops the meaningless local-graph sidebar panels
+  (Spaces, Followers, Friends) in favour of a "Remote account" panel linking to
+  the origin profile with the real follower/following counts, and hides the
+  "Add Friend" button (a friend request to a remote account can't be accepted).
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

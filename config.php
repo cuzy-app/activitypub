@@ -18,6 +18,8 @@ return [
         ['class' => 'humhub\modules\user\widgets\AccountMenu', 'event' => 'init', 'callback' => ['humhub\modules\fediverse\Events', 'onAccountMenuInit']],
         ['class' => 'humhub\modules\user\widgets\ProfileMenu', 'event' => 'init', 'callback' => ['humhub\modules\fediverse\Events', 'onProfileMenuInit']],
         ['class' => 'humhub\modules\user\widgets\ProfileHeaderCounterSet', 'event' => 'beforeRun', 'callback' => ['humhub\modules\fediverse\Events', 'onProfileHeaderCounterSet']],
+        ['class' => 'humhub\modules\user\widgets\ProfileSidebar', 'event' => 'init', 'callback' => ['humhub\modules\fediverse\Events', 'onProfileSidebarInit']],
+        ['class' => 'humhub\modules\friendship\widgets\FriendshipButton', 'event' => 'beforeRun', 'callback' => ['humhub\modules\fediverse\Events', 'onFriendshipButton']],
         ['class' => 'humhub\modules\user\source\UserSourceCollection', 'event' => 'beforeUserSourcesSet', 'callback' => ['humhub\modules\fediverse\Events', 'onUserSourceCollectionSet']],
     ],
     'consoleControllerMap' => [

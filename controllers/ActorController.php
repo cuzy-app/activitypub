@@ -33,7 +33,7 @@ class ActorController extends Controller
 
         $actor = (new KeyManager())->getOrCreateForUser($user);
         $extras = PersonSerializer::profileExtras($user);
-        $doc = (new PersonSerializer())->serialize($actor, $user->displayName, $user->getUrl(true), $extras['summary'], $extras['icon']);
+        $doc = (new PersonSerializer())->serialize($actor, $user->displayName, $user->getUrl(true), $extras['summary'], $extras['icon'], $extras['image']);
 
         return $this->asActivityJson($doc);
     }

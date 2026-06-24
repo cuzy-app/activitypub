@@ -19,8 +19,9 @@ class PersonSerializer
      * @param string $profileUrl absolute HTML profile URL
      * @param string|null $summary optional HTML bio (Person actors only)
      * @param array|null $icon optional avatar image object (Person actors only)
+     * @param array|null $image optional banner image object (Person actors only)
      */
-    public function serialize(LocalActor $actor, string $name, string $profileUrl, ?string $summary = null, ?array $icon = null): array
+    public function serialize(LocalActor $actor, string $name, string $profileUrl, ?string $summary = null, ?array $icon = null, ?array $image = null): array
     {
         $id = $actor->ap_id;
 
@@ -53,15 +54,19 @@ class PersonSerializer
         if ($icon !== null) {
             $doc['icon'] = $icon;
         }
+        if ($image !== null) {
+            $doc['image'] = $image;
+        }
         return $doc;
     }
 
     /**
-     * Derive a user's actor-document extras: bio (summary) and avatar (icon).
-     * `summary` is null when the user has no bio. Call from contexts with a
-     * request (web), so the avatar URL resolves to an absolute https URL.
+     * Derive a user's actor-document extras: bio (summary), avatar (icon) and
+     * banner (image). `summary`/`image` are null when the user has no bio/banner.
+     * Call from contexts with a request (web), so the image URLs resolve to
+     * absolute https URLs.
      *
-     * @return array{summary:?string,icon:array}
+     * @return array{summary:?string,icon:array,image:?array}
      */
     public static function profileExtras(User $user): array
     {
@@ -69,6 +74,10 @@ class PersonSerializer
         return [
             'summary' => $about !== '' ? RichText::convert($about, RichText::FORMAT_HTML) : null,
             'icon' => ['type' => 'Image', 'url' => $user->getProfileImage()->getUrl(null, true)],
+            // Only advertise a banner the user actually set, else Mastodon would show a blank header.
+            'image' => $user->bannerImage->exists()
+                ? ['type' => 'Image', 'url' => $user->bannerImage->getUrl(null, true)]
+                : null,
         ];
     }
 

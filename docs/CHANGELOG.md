@@ -25,9 +25,10 @@
   ingested post sends a signed `Like` / `Create{Note, inReplyTo}` back to the
   author (and `Undo{Like}` on unlike); inbound interactions are loop-guarded so
   they are never re-federated.
-- Enh: Profile sync — the actor document carries the user's avatar (`icon`) and
-  bio (`summary`), and a display-name or bio change is federated to remote
-  followers as a signed `Update{Person}`, so Mastodon refreshes the cached profile.
+- Enh: Profile sync — the actor document carries the user's avatar (`icon`),
+  banner (`image`) and bio (`summary`), and a display-name or bio change is
+  federated to remote followers as a signed `Update{Person}`, so Mastodon
+  refreshes the cached profile.
 - Enh: Threading — a local comment on a local federated post is delivered as a
   `Create{Note, inReplyTo}` to the post author's remote followers (signed by the
   commenter), so replies stay threaded on Mastodon.
@@ -60,6 +61,13 @@
 - Enh: The outbound delivery fan-out eager-loads followers' remote actors (one
   query instead of an N+1 per follower), so delivering to many followers no
   longer runs a query per follower.
+- Enh: The actor `outbox` is a proper paged `OrderedCollection` — the collection
+  advertises `first`/`last` and `?page=N` returns an `OrderedCollectionPage` of
+  the user's `Create` activities (newest first) with `next`/`prev`; previously the
+  page link was advertised but never served the items.
+- Enh: Changing a local user's profile avatar or banner federates an
+  `Update{Person}` to their remote followers immediately (previously only a name
+  or bio change did), so Mastodon refreshes the cached image.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

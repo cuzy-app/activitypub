@@ -340,9 +340,27 @@ class Events
         }
 
         $user = $profile->user;
-        if ($user === null) {
+        if ($user !== null) {
+            self::sendActorUpdate($user);
+        }
+    }
+
+    /** Local user changed avatar/banner → Update{Person} (no core image-change event, so via the user ImageController's afterAction). */
+    public static function onProfileImageChanged($event): void
+    {
+        $imageActions = ['upload', 'banner-upload', 'crop', 'crop-banner', 'delete'];
+        if (!in_array($event->action->id ?? '', $imageActions, true)) {
             return;
         }
+        $container = $event->sender->contentContainer ?? null;
+        if ($container instanceof User) {
+            self::sendActorUpdate($container);
+        }
+    }
+
+    /** Build + fan out an Update{Person} for a local user (no-op if not federatable or has no followers). */
+    private static function sendActorUpdate(User $user): void
+    {
         $actor = self::federatableActor((int) $user->id);
         if ($actor === null) {
             return; // shadow user (loop guard) or not federatable
@@ -359,7 +377,7 @@ class Events
 
         $serializer = new PersonSerializer();
         $extras = PersonSerializer::profileExtras($user);
-        $document = $serializer->serialize($actor, $user->displayName, $user->getUrl(true), $extras['summary'], $extras['icon']);
+        $document = $serializer->serialize($actor, $user->displayName, $user->getUrl(true), $extras['summary'], $extras['icon'], $extras['image']);
         $activity = $serializer->updateActivity($actor, $document, $actor->ap_id . '#updates/' . bin2hex(random_bytes(8)));
 
         Yii::$app->queue->push(new DeliverActivity([

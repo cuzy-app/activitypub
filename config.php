@@ -28,6 +28,7 @@ return [
     ],
     'urlManagerRules' => [
         ['pattern' => '.well-known/webfinger', 'route' => 'fediverse/webfinger/index'],
+        ['pattern' => 'authorize_interaction', 'route' => 'fediverse/remote-interaction/index'],
         ['pattern' => '.well-known/nodeinfo', 'route' => 'fediverse/nodeinfo/index'],
         ['pattern' => 'nodeinfo/2.1', 'route' => 'fediverse/nodeinfo/schema'],
         ['pattern' => 'fediverse/instance-actor', 'route' => 'fediverse/actor/instance'],

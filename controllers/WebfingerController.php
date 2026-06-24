@@ -89,6 +89,12 @@ class WebfingerController extends Controller
                 'href' => $profileUrl,
             ];
         }
+        // Remote-follow template: lets other servers route a follow of one of our
+        // users through our /authorize_interaction landing.
+        $links[] = [
+            'rel' => 'http://ostatus.org/schema/1.0/subscribe',
+            'template' => FederationUrl::base() . '/authorize_interaction?uri={uri}',
+        ];
 
         $response = Yii::$app->response;
         $response->format = Response::FORMAT_RAW;

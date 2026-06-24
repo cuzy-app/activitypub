@@ -94,6 +94,10 @@
   engagement line — the post's real favourite/boost counts and a "View original"
   link to the source thread (where the replies live). Counts come from the Note
   document and refresh lazily in the background (6h) when the post is viewed.
+- Enh: Remote-follow landing — following a local user from elsewhere in the
+  Fediverse now works: WebFinger advertises the `subscribe` template and a new
+  `/authorize_interaction` endpoint lets a logged-in user confirm and follow a
+  remote account (by handle or profile URL) they discovered on another server.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

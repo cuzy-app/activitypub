@@ -89,6 +89,11 @@
   (Spaces, Followers, Friends) in favour of a "Remote account" panel linking to
   the origin profile with the real follower/following counts, and hides the
   "Add Friend" button (a friend request to a remote account can't be accepted).
+- Enh: Ingested remote posts keep their native like/comment (a local like or
+  reply still federates back to the author) and additionally show a Fediverse
+  engagement line — the post's real favourite/boost counts and a "View original"
+  link to the source thread (where the replies live). Counts come from the Note
+  document and refresh lazily in the background (6h) when the post is viewed.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

@@ -12,6 +12,7 @@ use humhub\modules\content\widgets\richtext\RichText;
 use humhub\modules\fediverse\jobs\DeliverActivity;
 use humhub\modules\fediverse\jobs\DeliverToInbox;
 use humhub\modules\fediverse\jobs\RefreshRemoteActor;
+use humhub\modules\fediverse\jobs\RefreshRemotePost;
 use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\FederationObject;
 use humhub\modules\fediverse\models\LocalActor;
@@ -479,6 +480,51 @@ class Events
         if ($user instanceof User && RemoteActor::findOne(['user_id' => $user->id]) !== null) {
             $event->isValid = false;
         }
+    }
+
+    /** Remote posts: keep native like/comment (federates out), add a separate Fediverse-engagement indicator. */
+    public static function onWallEntryLinksRun($event): void
+    {
+        $apId = self::remotePostApId($event->sender->object ?? null);
+        if ($apId === null) {
+            return;
+        }
+        self::lazyRefreshRemotePost($apId);
+        $event->sender->addWidget('humhub\modules\fediverse\widgets\RemotePostEngagement', ['apId' => $apId], ['sortOrder' => 100]);
+    }
+
+    /** If the wall object is an ingested remote post, return its Note AP id; else null. */
+    private static function remotePostApId($object): ?string
+    {
+        if (!$object instanceof Post) {
+            return null;
+        }
+        $authorId = (int) ($object->content->created_by ?? 0);
+        if ($authorId === 0 || RemoteActor::findOne(['user_id' => $authorId]) === null) {
+            return null; // local post — leave native UI untouched
+        }
+        $fed = FederationObject::findOne([
+            'direction' => FederationObject::DIRECTION_REMOTE,
+            'object_type' => 'Note',
+            'model_class' => Post::class,
+            'model_id' => $object->id,
+        ]);
+        return $fed?->ap_id;
+    }
+
+    /** Enqueue a background refresh of a remote post's cached counts if absent/expired (6h TTL). */
+    private static function lazyRefreshRemotePost(string $apId): void
+    {
+        $cache = Yii::$app->cache;
+        if ($cache->get('fediverse.poststats.' . md5($apId)) !== false) {
+            return; // fresh within TTL
+        }
+        $lock = 'fediverse.poststats.lock.' . md5($apId);
+        if ($cache->get($lock)) {
+            return;
+        }
+        $cache->set($lock, 1, 600);
+        Yii::$app->queue->push(new RefreshRemotePost(['apId' => $apId]));
     }
 
     /** Build + fan out an Update{Person} for a local user (no-op if not federatable or has no followers). */

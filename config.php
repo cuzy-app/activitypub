@@ -20,6 +20,7 @@ return [
         ['class' => 'humhub\modules\user\widgets\ProfileHeaderCounterSet', 'event' => 'beforeRun', 'callback' => ['humhub\modules\fediverse\Events', 'onProfileHeaderCounterSet']],
         ['class' => 'humhub\modules\user\widgets\ProfileSidebar', 'event' => 'init', 'callback' => ['humhub\modules\fediverse\Events', 'onProfileSidebarInit']],
         ['class' => 'humhub\modules\friendship\widgets\FriendshipButton', 'event' => 'beforeRun', 'callback' => ['humhub\modules\fediverse\Events', 'onFriendshipButton']],
+        ['class' => 'humhub\modules\content\widgets\WallEntryLinks', 'event' => 'run', 'callback' => ['humhub\modules\fediverse\Events', 'onWallEntryLinksRun']],
         ['class' => 'humhub\modules\user\source\UserSourceCollection', 'event' => 'beforeUserSourcesSet', 'callback' => ['humhub\modules\fediverse\Events', 'onUserSourceCollectionSet']],
     ],
     'consoleControllerMap' => [

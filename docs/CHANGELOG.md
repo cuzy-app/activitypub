@@ -68,6 +68,16 @@
 - Enh: Changing a local user's profile avatar or banner federates an
   `Update{Person}` to their remote followers immediately (previously only a name
   or bio change did), so Mastodon refreshes the cached image.
+- Enh: A dedicated "Fediverse" entry in the user account navigation opens one
+  page bundling all per-user options — your `@user@domain` handle, the publish
+  opt-in, following a remote account by handle, and the list of accounts you
+  follow (with unfollow). It replaces the two separate, unlinked pages.
+- Enh: A federated (remote) user's profile now shows a "Fediverse profile" link
+  in the profile menu (to their original account) and replaces the misleading
+  local follower/friend counters with the account's real Fediverse
+  follower/following counts. The counts (and the profile) are refreshed lazily
+  in the background when the profile is viewed and the cached data is older than
+  a day, so they stay reasonably current without any periodic job.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

@@ -48,6 +48,7 @@ class RemoteActorResolver
         $remote->outbox_url = $doc['outbox'] ?? null;
         $remote->public_key = $doc['publicKey']['publicKeyPem'] ?? null;
         $remote->icon_url = is_array($doc['icon'] ?? null) ? ($doc['icon']['url'] ?? null) : null;
+        $remote->profile_url = self::extractUrl($doc['url'] ?? null);
         $remote->last_refreshed_at = date('Y-m-d H:i:s');
 
         if ($remote->inbox_url === '' || $remote->public_key === null) {
@@ -82,6 +83,100 @@ class RemoteActorResolver
             throw new RuntimeException('Invalid actor document: ' . $actorUrl);
         }
         return $data;
+    }
+
+    /** Best-effort re-fetch of the actor: profile fields, images, and follower/following counts. */
+    public function refresh(RemoteActor $remote): void
+    {
+        try {
+            $doc = $this->fetchActorDocument($remote->ap_id);
+        } catch (\Throwable $e) {
+            Yii::warning('Fediverse refresh failed for ' . $remote->ap_id . ': ' . $e->getMessage(), 'fediverse');
+            // Bump the timestamp so a dead/unreachable actor is not re-fetched on every view.
+            $remote->last_refreshed_at = date('Y-m-d H:i:s');
+            $remote->save(false);
+            return;
+        }
+        if ((string) ($doc['id'] ?? '') !== $remote->ap_id) {
+            return; // actor id mismatch
+        }
+
+        if (isset($doc['preferredUsername'])) {
+            $remote->preferred_username = (string) $doc['preferredUsername'];
+        }
+        if (!empty($doc['publicKey']['publicKeyPem'])) {
+            $remote->public_key = (string) $doc['publicKey']['publicKeyPem'];
+        }
+        if (is_array($doc['icon'] ?? null) && !empty($doc['icon']['url'])) {
+            $remote->icon_url = (string) $doc['icon']['url'];
+        }
+        $url = self::extractUrl($doc['url'] ?? null);
+        if ($url !== null) {
+            $remote->profile_url = $url;
+        }
+        $remote->followers_count = $this->fetchCollectionTotal($doc['followers'] ?? null);
+        $remote->following_count = $this->fetchCollectionTotal($doc['following'] ?? null);
+        $remote->last_refreshed_at = date('Y-m-d H:i:s');
+        $remote->save(false);
+
+        $user = User::findOne($remote->user_id);
+        if ($user === null) {
+            return;
+        }
+        $this->applyProfileImages($user, $doc);
+        $profile = $user->profile;
+        if ($profile !== null) {
+            $name = trim((string) ($doc['name'] ?? '')) ?: (string) ($remote->preferred_username ?? '');
+            if ($name !== '') {
+                $profile->fediverse_displayname = mb_substr($name, 0, 255);
+            }
+            $summary = trim(strip_tags((string) ($doc['summary'] ?? '')));
+            if ($summary !== '') {
+                $profile->about = $summary;
+            }
+            $profile->save(false);
+        }
+    }
+
+    /** GET an AP collection and return its `totalItems`, or null if unavailable/blocked. */
+    private function fetchCollectionTotal($url): ?int
+    {
+        if (!is_string($url) || $url === '' || !UrlSafety::isSafePublicUrl($url)) {
+            return null;
+        }
+        try {
+            $response = (new FederationHttpClient())->createRequest()
+                ->setMethod('GET')
+                ->setUrl($url)
+                ->addHeaders(['Accept' => 'application/activity+json'])
+                ->send();
+            if (!$response->getIsOk()) {
+                return null;
+            }
+            $data = json_decode($response->getContent(), true);
+            return isset($data['totalItems']) && is_numeric($data['totalItems']) ? (int) $data['totalItems'] : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /** Extract a usable human profile URL from an AP `url` value (string or array of links). */
+    private static function extractUrl($url): ?string
+    {
+        if (is_string($url) && $url !== '') {
+            return $url;
+        }
+        if (is_array($url)) {
+            foreach ($url as $u) {
+                if (is_string($u) && $u !== '') {
+                    return $u;
+                }
+                if (is_array($u) && !empty($u['href'])) {
+                    return (string) $u['href'];
+                }
+            }
+        }
+        return null;
     }
 
     private function createShadowUser(array $doc, string $actorUrl): User

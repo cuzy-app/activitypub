@@ -2,6 +2,7 @@
 
 namespace humhub\modules\fediverse;
 
+use humhub\helpers\ControllerHelper;
 use humhub\models\RecordMap;
 use humhub\modules\comment\models\Comment;
 use humhub\modules\content\events\ContentStateEvent;
@@ -10,6 +11,7 @@ use humhub\modules\content\models\Content;
 use humhub\modules\content\widgets\richtext\RichText;
 use humhub\modules\fediverse\jobs\DeliverActivity;
 use humhub\modules\fediverse\jobs\DeliverToInbox;
+use humhub\modules\fediverse\jobs\RefreshRemoteActor;
 use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\FederationObject;
 use humhub\modules\fediverse\models\LocalActor;
@@ -24,6 +26,8 @@ use humhub\modules\fediverse\services\PersonSerializer;
 use humhub\modules\fediverse\services\RemoteTargetResolver;
 use humhub\modules\like\models\Like;
 use humhub\modules\post\models\Post;
+use humhub\modules\ui\menu\MenuLink;
+use humhub\modules\ui\widgets\CounterSetItem;
 use humhub\modules\user\events\FollowEvent;
 use humhub\modules\user\models\Profile;
 use humhub\modules\user\models\User;
@@ -356,6 +360,102 @@ class Events
         if ($container instanceof User) {
             self::sendActorUpdate($container);
         }
+    }
+
+    /** Adds a top-level "Fediverse" entry to the user account navigation (its own nav point, not buried under Settings). */
+    public static function onAccountMenuInit($event): void
+    {
+        if (Yii::$app->user->isGuest || !DiscoveryPolicy::isGloballyEnabled()) {
+            return;
+        }
+        $event->sender->addEntry(new MenuLink([
+            'label' => Yii::t('FediverseModule.base', 'Fediverse'),
+            'id' => 'account-fediverse',
+            'icon' => 'globe',
+            'url' => ['/fediverse/settings'],
+            'sortOrder' => 125,
+            'isActive' => ControllerHelper::isActivePath('fediverse', 'settings'),
+        ]));
+    }
+
+    /** Profile menu: add a link to the original remote profile (federated shadow users only) + lazy-refresh. */
+    public static function onProfileMenuInit($event): void
+    {
+        $user = $event->sender->user ?? null;
+        if (!$user instanceof User) {
+            return;
+        }
+        $remote = RemoteActor::findOne(['user_id' => $user->id]);
+        if ($remote === null) {
+            return;
+        }
+        self::lazyRefreshRemoteActor($remote);
+
+        $event->sender->addEntry(new MenuLink([
+            'label' => Yii::t('FediverseModule.base', 'Fediverse profile'),
+            'id' => 'profile-fediverse',
+            'icon' => 'globe',
+            'url' => $remote->profile_url ?: $remote->ap_id,
+            'htmlOptions' => ['target' => '_blank', 'rel' => 'noopener'],
+            'sortOrder' => 400,
+            'isActive' => false,
+        ]));
+    }
+
+    /** Profile header: replace the misleading local-graph counters with the real remote counts (or hide them). */
+    public static function onProfileHeaderCounterSet($event): void
+    {
+        $widget = $event->sender;
+        $user = $widget->user ?? null;
+        if (!$user instanceof User) {
+            return;
+        }
+        $remote = RemoteActor::findOne(['user_id' => $user->id]);
+        if ($remote === null) {
+            return; // local user → leave native counters untouched
+        }
+
+        $counters = [];
+        if ($remote->followers_count !== null) {
+            $counters[] = new CounterSetItem([
+                'label' => Yii::t('FediverseModule.base', 'Followers'),
+                'value' => (int) $remote->followers_count,
+                'url' => null,
+            ]);
+        }
+        if ($remote->following_count !== null) {
+            $counters[] = new CounterSetItem([
+                'label' => Yii::t('FediverseModule.base', 'Following'),
+                'value' => (int) $remote->following_count,
+                'url' => null,
+            ]);
+        }
+
+        if (empty($counters)) {
+            $event->isValid = false; // no real numbers yet → hide rather than mislead
+            return;
+        }
+        $widget->counters = $counters;
+    }
+
+    /** Enqueue a background refresh of a remote actor if its cached data is stale or counts are missing. */
+    private static function lazyRefreshRemoteActor(RemoteActor $remote): void
+    {
+        $ttl = 24 * 3600;
+        $last = $remote->last_refreshed_at ? strtotime((string) $remote->last_refreshed_at) : 0;
+        $stale = !$last || (time() - $last) >= $ttl;
+        $missingCounts = $remote->followers_count === null && $remote->following_count === null;
+        if (!$stale && !$missingCounts) {
+            return;
+        }
+        // De-dupe concurrent enqueues for the same actor within a short window.
+        $cache = Yii::$app->cache;
+        $key = 'fediverse.refresh.' . $remote->id;
+        if ($cache->get($key)) {
+            return;
+        }
+        $cache->set($key, 1, 600);
+        Yii::$app->queue->push(new RefreshRemoteActor(['remoteActorId' => (int) $remote->id]));
     }
 
     /** Build + fan out an Update{Person} for a local user (no-op if not federatable or has no followers). */

@@ -19,6 +19,9 @@ use yii\db\Expression;
  * @property string|null $outbox_url
  * @property string|null $public_key
  * @property string|null $icon_url
+ * @property string|null $profile_url
+ * @property int|null $followers_count
+ * @property int|null $following_count
  * @property string|null $last_refreshed_at
  * @property string|null $created_at
  * @property string|null $updated_at

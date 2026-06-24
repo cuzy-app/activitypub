@@ -10,6 +10,7 @@ use humhub\modules\fediverse\models\RemoteActor;
 use humhub\modules\file\models\File;
 use humhub\modules\post\models\Post;
 use humhub\modules\fediverse\services\ActivityDelivery;
+use humhub\modules\fediverse\services\FederatedHtml;
 use humhub\modules\fediverse\services\InboundInteractionService;
 use humhub\modules\fediverse\services\LocalObjectResolver;
 use humhub\modules\fediverse\services\RemoteActorResolver;
@@ -315,7 +316,7 @@ class ProcessInboxActivity extends ActiveJob
             Yii::warning('Fediverse Update: actor is not the author of the target', 'fediverse');
             return;
         }
-        $record->message = trim(strip_tags((string) ($object['content'] ?? '')));
+        $record->message = FederatedHtml::toText($object['content'] ?? null);
         try {
             if (!$record->save()) {
                 Yii::warning('Fediverse Update save failed: ' . implode(', ', $record->getErrorSummary(true)), 'fediverse');
@@ -359,7 +360,7 @@ class ProcessInboxActivity extends ActiveJob
                 // HumHub requires a last name; shadow profiles use the domain (matches createShadowUser).
                 $profile->lastname = mb_substr((string) ($remote->domain ?: parse_url((string) $remote->ap_id, PHP_URL_HOST)), 0, 255);
             }
-            $summary = trim(strip_tags((string) ($doc['summary'] ?? '')));
+            $summary = FederatedHtml::toText($doc['summary'] ?? null);
             if ($summary !== '') {
                 $profile->about = $summary;
             }
@@ -458,7 +459,7 @@ class ProcessInboxActivity extends ActiveJob
         }
 
         $post = new \humhub\modules\post\models\Post($shadow, \humhub\modules\content\models\Content::VISIBILITY_PUBLIC, [
-            'message' => trim(strip_tags((string) ($note['content'] ?? ''))),
+            'message' => FederatedHtml::toText($note['content'] ?? null),
         ]);
         $post->created_by = $shadow->id;
         $post->autoFollow = false;

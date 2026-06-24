@@ -130,7 +130,7 @@ class RemoteActorResolver
             if ($name !== '') {
                 $profile->fediverse_displayname = mb_substr($name, 0, 255);
             }
-            $summary = trim(strip_tags((string) ($doc['summary'] ?? '')));
+            $summary = FederatedHtml::toText($doc['summary'] ?? null);
             if ($summary !== '') {
                 $profile->about = $summary;
             }

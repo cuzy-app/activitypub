@@ -98,6 +98,9 @@
   Fediverse now works: WebFinger advertises the `subscribe` template and a new
   `/authorize_interaction` endpoint lets a logged-in user confirm and follow a
   remote account (by handle or profile URL) they discovered on another server.
+- Fix: Federated text from remote servers (post bodies, comments, bios) keeps its
+  paragraph/line breaks and decodes HTML entities (e.g. `&amp;` → `&`), instead of
+  naive tag-stripping that ran paragraphs together and left entities visible.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

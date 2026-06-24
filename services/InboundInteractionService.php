@@ -94,16 +94,8 @@ class InboundInteractionService
 
     private function toPlainText(string $html): string
     {
-        // Mastodon Note content is HTML; store a readable plain-text comment for now.
-        $text = preg_replace('#</p>\s*<p>#i', "\n\n", $html);
-        if ($text === null) {
-            $text = $html;
-        }
-        $stripped = preg_replace('#<br\s*/?>#i', "\n", $text);
-        if ($stripped === null) {
-            $stripped = $text;
-        }
-        return trim(html_entity_decode(strip_tags($stripped), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        // Mastodon Note content is HTML; store readable plain text (block breaks + decoded entities).
+        return FederatedHtml::toText($html);
     }
 
     private function record(string $apId, string $type, string $modelClass, int $modelId): void

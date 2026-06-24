@@ -8,6 +8,7 @@ use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\models\RemoteActor;
 use humhub\modules\fediverse\services\DiscoveryPolicy;
+use humhub\modules\fediverse\services\FederatedHtml;
 use humhub\modules\like\models\Like;
 use humhub\modules\fediverse\services\FederatedUserSource;
 use humhub\modules\fediverse\services\FederationUrl;
@@ -155,7 +156,7 @@ class FediverseController extends Controller
                     if ($profile !== null) {
                         $name = trim((string) ($doc['name'] ?? '')) ?: (string) $remote->preferred_username;
                         $profile->fediverse_displayname = mb_substr($name, 0, 255);
-                        $summary = trim(strip_tags((string) ($doc['summary'] ?? '')));
+                        $summary = FederatedHtml::toText($doc['summary'] ?? null);
                         $profile->about = $summary !== '' ? $summary : $profile->about;
                         $profile->save(false);
                     }

@@ -46,34 +46,37 @@ class ProcessInboxActivity extends ActiveJob
             return;
         }
 
-        // Authenticate BEFORE any persistence or trust.
-        $remote = $this->authenticate($actorUrl);
-        if ($remote === null) {
+        // Authenticate BEFORE any persistence or trust. Returns the verified
+        // signer document; the shadow actor is created lazily by the handlers,
+        // only when something is actually stored.
+        $signerDoc = $this->authenticate($actorUrl);
+        if ($signerDoc === null) {
             Yii::warning('Fediverse inbox: authentication failed for ' . $actorUrl, 'fediverse');
             return;
         }
+        $signerId = (string) ($signerDoc['id'] ?? $actorUrl);
 
         switch ($activity['type']) {
             case 'Follow':
-                $this->handleFollow($activity, $remote);
+                $this->handleFollow($activity, $signerId, $signerDoc);
                 break;
             case 'Undo':
-                $this->handleUndo($activity, $remote);
+                $this->handleUndo($activity, $signerId);
                 break;
             case 'Create':
-                $this->handleCreate($activity, $remote);
+                $this->handleCreate($activity, $signerId, $signerDoc);
                 break;
             case 'Like':
-                $this->handleLike($activity, $remote);
+                $this->handleLike($activity, $signerId, $signerDoc);
                 break;
             case 'Accept':
-                $this->handleAccept($activity, $remote);
+                $this->handleAccept($activity, $signerId);
                 break;
             case 'Delete':
-                $this->handleDelete($activity, $remote);
+                $this->handleDelete($activity, $signerId);
                 break;
             case 'Update':
-                $this->handleUpdate($activity, $remote);
+                $this->handleUpdate($activity, $signerId);
                 break;
             default:
                 Yii::info('Fediverse inbox: ignoring unsupported type ' . $activity['type'], 'fediverse');
@@ -81,10 +84,12 @@ class ProcessInboxActivity extends ActiveJob
     }
 
     /**
-     * Verify the HTTP Signature and, on success, resolve+persist the actor.
-     * Returns null (caller drops the activity) on any verification failure.
+     * Verify the HTTP Signature and, on success, return the verified signer
+     * document (NOT persisted — handlers create the shadow actor only when they
+     * actually store something). Returns null (caller drops the activity) on any
+     * verification failure.
      */
-    private function authenticate(string $actorUrl): ?RemoteActor
+    private function authenticate(string $actorUrl): ?array
     {
         $parsed = SignatureService::parseSignatureHeader($this->headers['signature'] ?? '');
         if (empty($parsed['signature']) || empty($parsed['headers']) || empty($parsed['keyId'])) {
@@ -139,7 +144,13 @@ class ProcessInboxActivity extends ActiveJob
             return null;
         }
 
-        return $resolver->resolveFromDocument($signerId, $signerDoc);
+        return $signerDoc;
+    }
+
+    /** Persist (creating if needed) the signer as a remote actor — call only when about to store. */
+    private function persistActor(string $signerId, array $signerDoc): RemoteActor
+    {
+        return (new RemoteActorResolver())->resolveFromDocument($signerId, $signerDoc);
     }
 
     private function isFreshDate(string $date): bool
@@ -155,13 +166,14 @@ class ProcessInboxActivity extends ActiveJob
         return $delta <= 3600 && $delta >= -300; // up to 1h old, 5min future skew
     }
 
-    private function handleFollow(array $activity, RemoteActor $remote): void
+    private function handleFollow(array $activity, string $signerId, array $signerDoc): void
     {
         $localUser = $this->resolveFollowTarget($activity['object'] ?? null);
         if ($localUser === null) {
             Yii::warning('Fediverse Follow: unknown target object', 'fediverse');
             return;
         }
+        $remote = $this->persistActor($signerId, $signerDoc);
 
         $follow = FederationFollow::findOne([
             'local_user_id' => $localUser->id,
@@ -181,8 +193,12 @@ class ProcessInboxActivity extends ActiveJob
         $this->sendAccept($localUser, $remote, $activity);
     }
 
-    private function handleUndo(array $activity, RemoteActor $remote): void
+    private function handleUndo(array $activity, string $signerId): void
     {
+        $remote = RemoteActor::findOne(['ap_id' => $signerId]);
+        if ($remote === null) {
+            return; // nothing of theirs to undo
+        }
         $inner = $activity['object'] ?? null;
         if (!is_array($inner)) {
             return;
@@ -214,7 +230,7 @@ class ProcessInboxActivity extends ActiveJob
     }
 
     /** Inbound Create{Note, inReplyTo} → comment on the replied-to local content. */
-    private function handleCreate(array $activity, RemoteActor $remote): void
+    private function handleCreate(array $activity, string $signerId, array $signerDoc): void
     {
         $object = $activity['object'] ?? null;
         if (!is_array($object) || ($object['type'] ?? '') !== 'Note') {
@@ -222,13 +238,19 @@ class ProcessInboxActivity extends ActiveJob
         }
         $inReplyTo = $object['inReplyTo'] ?? null;
         if (!is_string($inReplyTo) || $inReplyTo === '') {
-            $this->ingestRemotePost($object, $remote);
+            // Top-level post: only ingest from an actor a local user already follows;
+            // never mint a shadow user for a stranger's post.
+            $remote = RemoteActor::findOne(['ap_id' => $signerId]);
+            if ($remote !== null) {
+                $this->ingestRemotePost($object, $remote);
+            }
             return;
         }
         $content = (new LocalObjectResolver())->resolveContent($inReplyTo);
         if ($content === null) {
             return; // a reply to something we don't host
         }
+        $remote = $this->persistActor($signerId, $signerDoc);
         $author = User::findOne($remote->user_id);
         if ($author === null) {
             return;
@@ -242,8 +264,12 @@ class ProcessInboxActivity extends ActiveJob
     }
 
     /** Inbound Delete{Note|Tombstone} → soft-delete the ingested remote post/comment (author only). */
-    private function handleDelete(array $activity, RemoteActor $remote): void
+    private function handleDelete(array $activity, string $signerId): void
     {
+        $remote = RemoteActor::findOne(['ap_id' => $signerId]);
+        if ($remote === null) {
+            return; // we have nothing of theirs to delete
+        }
         $apId = $this->objectId($activity['object'] ?? null);
         $record = $this->resolveRemoteRecord($apId);
         if ($record === null) {
@@ -263,8 +289,12 @@ class ProcessInboxActivity extends ActiveJob
     }
 
     /** Inbound Update{Note|Person|…} → update content or refresh remote actor. */
-    private function handleUpdate(array $activity, RemoteActor $remote): void
+    private function handleUpdate(array $activity, string $signerId): void
     {
+        $remote = RemoteActor::findOne(['ap_id' => $signerId]);
+        if ($remote === null) {
+            return; // unknown actor → nothing to update/refresh
+        }
         $object = $activity['object'] ?? null;
         if (!is_array($object)) {
             return;
@@ -370,21 +400,28 @@ class ProcessInboxActivity extends ActiveJob
     }
 
     /** Inbound Like → like the referenced local content. */
-    private function handleLike(array $activity, RemoteActor $remote): void
+    private function handleLike(array $activity, string $signerId, array $signerDoc): void
     {
         $apId = $this->objectId($activity['object'] ?? null);
         $record = (new LocalObjectResolver())->resolveLikeable($apId);
+        if ($record === null) {
+            Yii::warning('Fediverse Like: could not resolve likeable for ' . $apId, 'fediverse');
+            return; // don't mint a shadow user for a like we can't attach
+        }
+        $remote = $this->persistActor($signerId, $signerDoc);
         $author = User::findOne($remote->user_id);
-        if ($record !== null && $author !== null) {
+        if ($author !== null) {
             (new InboundInteractionService())->addLike($record, $author, (string) ($activity['id'] ?? ''));
-        } else {
-            Yii::warning('Fediverse Like: could not resolve likeable/author for ' . $apId, 'fediverse');
         }
     }
 
     /** Remote accepted our outbound Follow → mark our pending follow(s) to it accepted. */
-    private function handleAccept(array $activity, RemoteActor $remote): void
+    private function handleAccept(array $activity, string $signerId): void
     {
+        $remote = RemoteActor::findOne(['ap_id' => $signerId]);
+        if ($remote === null) {
+            return; // we never followed them → no pending follow to accept
+        }
         // Accept.object may be an embedded Follow OR a bare string (its AP id) — Mastodon sends a string.
         $inner = $activity['object'] ?? null;
         if (is_array($inner) && ($inner['type'] ?? 'Follow') !== 'Follow') {

@@ -78,6 +78,13 @@
   follower/following counts. The counts (and the profile) are refreshed lazily
   in the background when the profile is viewed and the cached data is older than
   a day, so they stay reasonably current without any periodic job.
+- Fix: Inbound activities no longer create a federated shadow user unless we
+  actually store something for them — a follow we accept, a like or reply on our
+  content, or a post from an account we follow. Boosts, likes/replies that don't
+  attach, posts from strangers, and Undo/Delete/Update/Accept from unknown actors
+  are processed without minting an empty user. A new
+  `fediverse/prune-remote-actors` console command removes the orphan shadow users
+  accumulated before this fix (no follow and no like/comment/post).
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

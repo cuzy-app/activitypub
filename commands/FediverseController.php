@@ -2,9 +2,13 @@
 
 namespace humhub\modules\fediverse\commands;
 
+use humhub\modules\comment\models\Comment;
+use humhub\modules\content\models\Content;
+use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\models\RemoteActor;
 use humhub\modules\fediverse\services\DiscoveryPolicy;
+use humhub\modules\like\models\Like;
 use humhub\modules\fediverse\services\FederatedUserSource;
 use humhub\modules\fediverse\services\FederationUrl;
 use humhub\modules\fediverse\services\KeyManager;
@@ -24,6 +28,66 @@ class FediverseController extends Controller
         $this->stdout('Instance actor: ' . FederationUrl::instanceActorUrl() . "\n");
         $this->stdout('Local actors: ' . LocalActor::find()->count() . "\n");
         return ExitCode::OK;
+    }
+
+    /**
+     * Usage: php protected/yii fediverse/prune-remote-actors [apply]
+     * Deletes federated shadow users with NO follow relationship and NO authored
+     * like/comment/content (safe orphans). Dry-run unless `apply` = 1.
+     */
+    public function actionPruneRemoteActors($apply = 0): int
+    {
+        $apply = ((int) $apply) === 1;
+        $prunable = [];
+        foreach (RemoteActor::find()->each() as $ra) {
+            if ($this->isPrunableActor($ra)) {
+                $prunable[] = $ra;
+            }
+        }
+        $this->stdout(count($prunable) . ' prunable shadow users (no follow, no like/comment/post)'
+            . ($apply ? "\n" : " [DRY-RUN]\n"));
+        if (!$apply) {
+            foreach (array_slice($prunable, 0, 20) as $ra) {
+                $this->stdout('  - ' . $ra->handle . "\n");
+            }
+            if (count($prunable) > 20) {
+                $this->stdout('  ... and ' . (count($prunable) - 20) . " more\n");
+            }
+            $this->stdout("Run `php protected/yii fediverse/prune-remote-actors 1` to delete.\n");
+            return ExitCode::OK;
+        }
+        $deleted = 0;
+        foreach ($prunable as $ra) {
+            $user = User::findOne($ra->user_id);
+            if ($user !== null) {
+                if ($user->delete()) {
+                    $deleted++;
+                }
+            } else {
+                $ra->delete();
+            }
+        }
+        $this->stdout("Deleted {$deleted} shadow users.\n");
+        return ExitCode::OK;
+    }
+
+    /** A remote actor is safe to prune if it has no follow link and authored no like/comment/content. */
+    private function isPrunableActor(RemoteActor $ra): bool
+    {
+        if (FederationFollow::find()->where(['remote_actor_id' => $ra->id])->exists()) {
+            return false;
+        }
+        $uid = (int) $ra->user_id;
+        if (Like::find()->where(['created_by' => $uid])->exists()) {
+            return false;
+        }
+        if (Comment::find()->where(['created_by' => $uid])->exists()) {
+            return false;
+        }
+        if (Content::find()->where(['created_by' => $uid])->exists()) {
+            return false;
+        }
+        return true;
     }
 
     /** Usage: php protected/yii fediverse/ensure-instance-actor */

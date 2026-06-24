@@ -57,6 +57,9 @@
   `@user@domain` sub-line are rendered via `displayNameCallback`, so a remote
   user shows as their real name (not `name domain`) and local users are
   unaffected.
+- Enh: The outbound delivery fan-out eager-loads followers' remote actors (one
+  query instead of an N+1 per follower), so delivering to many followers no
+  longer runs a query per follower.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

@@ -53,4 +53,9 @@ class FederationFollow extends ActiveRecord
             [['activity_ap_id'], 'string', 'max' => 255],
         ];
     }
+
+    public function getRemoteActor()
+    {
+        return $this->hasOne(RemoteActor::class, ['id' => 'remote_actor_id']);
+    }
 }

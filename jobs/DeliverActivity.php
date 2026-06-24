@@ -4,7 +4,6 @@ namespace humhub\modules\fediverse\jobs;
 
 use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\models\RemoteActor;
 use humhub\modules\fediverse\services\ActivityDelivery;
 use humhub\modules\queue\ActiveJob;
 use Yii;
@@ -36,12 +35,14 @@ class DeliverActivity extends ActiveJob
                 'local_user_id' => $this->localUserId,
                 'direction' => FederationFollow::DIRECTION_INBOUND,
                 'state' => FederationFollow::STATE_ACCEPTED,
-            ])->all();
+            ])
+            ->with('remoteActor') // eager-load to avoid an N+1 RemoteActor query per follower
+            ->all();
 
         $delivery = new ActivityDelivery();
         $sentInboxes = [];
         foreach ($follows as $follow) {
-            $remote = RemoteActor::findOne($follow->remote_actor_id);
+            $remote = $follow->remoteActor;
             if ($remote === null) {
                 continue;
             }

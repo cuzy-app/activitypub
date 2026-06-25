@@ -39,6 +39,21 @@ class InboxController extends Controller
             throw new BadRequestHttpException('Federation disabled');
         }
 
+        // DoS backstop: cap inbox POSTs per source IP in a fixed 1-minute window
+        // (the time bucket in the key makes it reset every minute regardless of
+        // load). Generous — Mastodon backs off and retries on 429. Soft backstop
+        // only: keyed on getUserIP() (depends on trusted-proxy config) and per
+        // egress IP, so it is not a hard DoS control.
+        $rlKey = 'fediverse.inbox.rl.' . md5((string) Yii::$app->request->getUserIP()) . '.' . (int) floor(time() / 60);
+        $hits = (int) Yii::$app->cache->get($rlKey);
+        if ($hits >= 300) {
+            Yii::$app->response->statusCode = 429;
+            Yii::$app->response->headers->set('Retry-After', '60');
+            Yii::$app->response->format = Response::FORMAT_RAW;
+            return Yii::$app->response;
+        }
+        Yii::$app->cache->set($rlKey, $hits + 1, 120);
+
         $rawBody = Yii::$app->request->getRawBody();
         $signature = Yii::$app->request->headers->get('signature');
         if ($rawBody === '' || $signature === null) {

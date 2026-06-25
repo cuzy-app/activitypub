@@ -101,6 +101,10 @@
 - Fix: Federated text from remote servers (post bodies, comments, bios) keeps its
   paragraph/line breaks and decodes HTML entities (e.g. `&amp;` → `&`), instead of
   naive tag-stripping that ran paragraphs together and left entities visible.
+- Enh: Outbound delivery is resilient — each activity is delivered per-inbox by a
+  retryable job that retries transient failures (5xx / connection errors, up to 3
+  attempts) and drops permanent ones (4xx/410), without re-delivering to inboxes
+  that already succeeded. The inbound inbox has a per-IP rate-limit backstop.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

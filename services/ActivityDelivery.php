@@ -18,8 +18,8 @@ class ActivityDelivery
         $this->signatures = $signatures ?? new SignatureService();
     }
 
-    /** @return bool true on a 2xx response */
-    public function deliver(LocalActor $signer, string $inboxUrl, array $activity): bool
+    /** @return int the HTTP status code of the delivery (throws on unsafe URL or transport error). */
+    public function deliver(LocalActor $signer, string $inboxUrl, array $activity): int
     {
         if (!UrlSafety::isSafePublicUrl($inboxUrl)) {
             throw new RuntimeException('Refusing to deliver to unsafe URL: ' . $inboxUrl);
@@ -61,6 +61,6 @@ class ActivityDelivery
             ->setContent($body)
             ->send();
 
-        return $response->getIsOk();
+        return (int) $response->getStatusCode();
     }
 }

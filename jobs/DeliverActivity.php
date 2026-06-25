@@ -4,7 +4,6 @@ namespace humhub\modules\fediverse\jobs;
 
 use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\services\ActivityDelivery;
 use humhub\modules\queue\ActiveJob;
 use Yii;
 
@@ -39,7 +38,8 @@ class DeliverActivity extends ActiveJob
             ->with('remoteActor') // eager-load to avoid an N+1 RemoteActor query per follower
             ->all();
 
-        $delivery = new ActivityDelivery();
+        // Fan out via one retryable per-inbox job each (de-duplicated by inbox), so a
+        // retry only re-hits the failed inbox, never the whole follower set.
         $sentInboxes = [];
         foreach ($follows as $follow) {
             $remote = $follow->remoteActor;
@@ -52,13 +52,11 @@ class DeliverActivity extends ActiveJob
                 continue;
             }
             $sentInboxes[$inbox] = true;
-            try {
-                if (!$delivery->deliver($signer, $inbox, $activity)) {
-                    Yii::warning('Fediverse delivery non-2xx to ' . $inbox, 'fediverse');
-                }
-            } catch (\Throwable $e) {
-                Yii::warning('Fediverse delivery failed to ' . $inbox . ': ' . $e->getMessage(), 'fediverse');
-            }
+            Yii::$app->queue->push(new DeliverToInbox([
+                'signerUserId' => $signerUserId,
+                'inboxUrl' => $inbox,
+                'activityJson' => $this->activityJson,
+            ]));
         }
     }
 }

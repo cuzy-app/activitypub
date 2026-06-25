@@ -9,7 +9,6 @@ use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\models\RemoteActor;
 use humhub\modules\file\models\File;
 use humhub\modules\post\models\Post;
-use humhub\modules\fediverse\services\ActivityDelivery;
 use humhub\modules\fediverse\services\FederatedHtml;
 use humhub\modules\fediverse\services\InboundInteractionService;
 use humhub\modules\fediverse\services\LocalObjectResolver;
@@ -574,12 +573,14 @@ class ProcessInboxActivity extends ActiveJob
         // activity. The shared inbox is for broadcast and silently drops an
         // unaddressed directed Accept (it returns 202 but never routes it).
         $inbox = $remote->inbox_url ?: $remote->shared_inbox_url;
-        try {
-            if (!(new ActivityDelivery())->deliver($signer, $inbox, $accept)) {
-                Yii::warning('Fediverse Accept delivery returned non-2xx for ' . $inbox, 'fediverse');
-            }
-        } catch (\Throwable $e) {
-            Yii::warning('Fediverse Accept delivery failed: ' . $e->getMessage(), 'fediverse');
+        if ($inbox === null || $inbox === '') {
+            return;
         }
+        // Deliver via a retryable per-inbox job (decoupled from inbox processing).
+        Yii::$app->queue->push(new DeliverToInbox([
+            'signerUserId' => (int) $localUser->id,
+            'inboxUrl' => $inbox,
+            'activityJson' => json_encode($accept, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ]));
     }
 }

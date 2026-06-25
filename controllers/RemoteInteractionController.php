@@ -30,6 +30,9 @@ class RemoteInteractionController extends Controller
             throw new BadRequestHttpException('Missing uri');
         }
         $user = Yii::$app->user->getIdentity();
+        if ($user === null) {
+            return $this->redirect(['/user/auth/login']);
+        }
         if (!DiscoveryPolicy::isDiscoverable($user)) {
             return $this->render('authorize', [
                 'uri' => $uri,

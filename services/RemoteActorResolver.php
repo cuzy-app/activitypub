@@ -194,6 +194,10 @@ class RemoteActorResolver
         $user->email = null; // FederatedUserSource declares email optional (core PR #8239)
         $user->status = User::STATUS_ENABLED;
         $user->visibility = User::VISIBILITY_REGISTERED_ONLY; // followable + profile-viewable, off public discovery
+        // Federated users must NOT land in the local default group; the core assigns it in
+        // afterSave() when the user has no group yet, so suppress it before saving and put
+        // them only in the configured remote-users group below.
+        $user->allowAssignDefaultGroup(false);
 
         try {
             if (!$user->save()) {
@@ -219,11 +223,6 @@ class RemoteActorResolver
         // nullable columns, so save without validation.
         if (!$profile->save(false)) {
             Yii::warning('Federated user profile save failed', 'fediverse');
-        }
-
-        $defaultGroup = Yii::$app->getModule('user')->getDefaultGroup();
-        if ($defaultGroup !== null) {
-            $defaultGroup->addUser($user);
         }
 
         // Categorise federated users in the admin-configured group (for People filtering).

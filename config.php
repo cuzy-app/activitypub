@@ -37,6 +37,8 @@ return [
         ['pattern' => 'fediverse/inbox', 'route' => 'fediverse/inbox/shared', 'verb' => ['POST']],
         ['pattern' => 'fediverse/actor/<guid:[\w\-]+>/inbox', 'route' => 'fediverse/inbox/user', 'verb' => ['POST']],
         ['pattern' => 'fediverse/actor/<guid:[\w\-]+>/outbox', 'route' => 'fediverse/outbox/index'],
+        ['pattern' => 'fediverse/actor/<guid:[\w\-]+>/following', 'route' => 'fediverse/actor/following'],
+        ['pattern' => 'fediverse/actor/<guid:[\w\-]+>/followers', 'route' => 'fediverse/actor/followers'],
         ['pattern' => 'fediverse/actor/<guid:[\w\-]+>', 'route' => 'fediverse/actor/index'],
     ],
 ];

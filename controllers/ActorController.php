@@ -3,6 +3,8 @@
 namespace humhub\modules\fediverse\controllers;
 
 use humhub\components\Controller;
+use humhub\modules\fediverse\models\FederationFollow;
+use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\services\DiscoveryPolicy;
 use humhub\modules\fediverse\services\KeyManager;
 use humhub\modules\fediverse\services\PersonSerializer;
@@ -46,6 +48,87 @@ class ActorController extends Controller
         }
         $actor = (new KeyManager())->getOrCreateInstanceActor();
         $doc = (new PersonSerializer())->serialize($actor, $actor->preferred_username, \humhub\modules\fediverse\services\FederationUrl::base());
+
+        return $this->asActivityJson($doc);
+    }
+
+    /** GET /fediverse/actor/<guid>/following */
+    public function actionFollowing($guid)
+    {
+        return $this->followCollection($guid, 'following', FederationFollow::DIRECTION_OUTBOUND);
+    }
+
+    /** GET /fediverse/actor/<guid>/followers */
+    public function actionFollowers($guid)
+    {
+        return $this->followCollection($guid, 'followers', FederationFollow::DIRECTION_INBOUND);
+    }
+
+    /**
+     * Serve a user's follow graph as a paged OrderedCollection of actor URIs so
+     * remote servers can read the real following/followers counts (totalItems).
+     * Only federated relationships have an AP identity — local HumHub follows are
+     * intentionally not part of these collections.
+     */
+    private function followCollection(string $guid, string $kind, string $direction): Response
+    {
+        $user = User::findOne(['guid' => $guid]);
+        if ($user === null || !DiscoveryPolicy::isDiscoverable($user)) {
+            throw new NotFoundHttpException();
+        }
+        $actor = LocalActor::findOne(['user_id' => $user->id]);
+        if ($actor === null) {
+            throw new NotFoundHttpException();
+        }
+
+        $query = FederationFollow::find()
+            ->where(['local_user_id' => $user->id, 'direction' => $direction]);
+        // Outbound: everything the user actively follows (mirrors the settings list);
+        // inbound: only accepted followers.
+        if ($direction === FederationFollow::DIRECTION_OUTBOUND) {
+            $query->andWhere(['!=', 'state', FederationFollow::STATE_REJECTED]);
+        } else {
+            $query->andWhere(['state' => FederationFollow::STATE_ACCEPTED]);
+        }
+        $query->orderBy(['id' => SORT_DESC]);
+
+        $total = (int) $query->count();
+        $pageSize = 50;
+        $lastPage = max(1, (int) ceil($total / $pageSize));
+        $base = $actor->ap_id . '/' . $kind;
+        $page = (int) Yii::$app->request->get('page', 0);
+
+        if ($page < 1) {
+            $doc = [
+                '@context' => 'https://www.w3.org/ns/activitystreams',
+                'id' => $base,
+                'type' => 'OrderedCollection',
+                'totalItems' => $total,
+                'first' => $base . '?page=1',
+                'last' => $base . '?page=' . $lastPage,
+            ];
+        } else {
+            $items = [];
+            foreach ($query->with('remoteActor')->offset(($page - 1) * $pageSize)->limit($pageSize)->all() as $follow) {
+                $apId = $follow->remoteActor->ap_id ?? null;
+                if ($apId) {
+                    $items[] = $apId;
+                }
+            }
+            $doc = [
+                '@context' => 'https://www.w3.org/ns/activitystreams',
+                'id' => $base . '?page=' . $page,
+                'type' => 'OrderedCollectionPage',
+                'partOf' => $base,
+                'orderedItems' => $items,
+            ];
+            if ($page < $lastPage) {
+                $doc['next'] = $base . '?page=' . ($page + 1);
+            }
+            if ($page > 1) {
+                $doc['prev'] = $base . '?page=' . ($page - 1);
+            }
+        }
 
         return $this->asActivityJson($doc);
     }

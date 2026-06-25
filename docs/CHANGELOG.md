@@ -65,6 +65,12 @@
   advertises `first`/`last` and `?page=N` returns an `OrderedCollectionPage` of
   the user's `Create` activities (newest first) with `next`/`prev`; previously the
   page link was advertised but never served the items.
+- Fix: The actor `following` and `followers` collections are now served as paged
+  `OrderedCollection`s. The actor document advertised these URLs but they returned
+  404, so remote servers (e.g. Mastodon) could not read the real counts and showed
+  an incomplete number. They now report the true `totalItems` and list the
+  federated accounts followed / followers; local-only HumHub follows are not
+  included, as they have no Fediverse identity.
 - Enh: Changing a local user's profile avatar or banner federates an
   `Update{Person}` to their remote followers immediately (previously only a name
   or bio change did), so Mastodon refreshes the cached image.

@@ -30,6 +30,9 @@ use yii\helpers\Html;
 
     <h4><?= Yii::t('FediverseModule.base', 'Publish your posts'); ?></h4>
     <p><?= Yii::t('FediverseModule.base', 'When enabled, your public profile posts are delivered to your Fediverse followers.'); ?></p>
+    <div class="alert alert-info">
+        <?= Yii::t('FediverseModule.base', 'Heads-up: liking or commenting on federated content is also sent to the Fediverse — your like or reply is delivered to the remote author and their server, and is publicly visible there.'); ?>
+    </div>
     <?= Html::beginForm(['publish']); ?>
         <div class="checkbox">
             <label>

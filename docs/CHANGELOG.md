@@ -117,6 +117,9 @@
   an admin viewer — useful for debugging e.g. mis-parsed remote content.
 - Enh: The Fediverse admin page shows basic statistics — local/remote actors,
   inbound/outbound follow counts, and federated vs. ingested post counts.
+- Enh: The Fediverse settings page notes that liking or commenting on federated
+  content is itself federated (delivered to the remote author and publicly
+  visible there).
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

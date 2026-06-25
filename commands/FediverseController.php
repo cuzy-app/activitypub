@@ -91,6 +91,71 @@ class FediverseController extends Controller
         return true;
     }
 
+    /**
+     * Usage: php protected/yii fediverse/reprocess-remote-posts
+     * Re-fetches each ingested remote post and re-applies the current text/HTML
+     * conversion and trailing-hashtag → topic parsing (for posts ingested before
+     * those features landed). Idempotent.
+     */
+    public function actionReprocessRemotePosts(): int
+    {
+        $count = 0;
+        foreach (\humhub\modules\fediverse\models\FederationObject::find()
+                     ->where(['direction' => 'remote', 'object_type' => 'Note', 'model_class' => \humhub\modules\post\models\Post::class])
+                     ->each() as $obj) {
+            $post = \humhub\modules\post\models\Post::findOne($obj->model_id);
+            if ($post === null) {
+                continue;
+            }
+            try {
+                $doc = (new RemoteActorResolver())->fetchActorDocument($obj->ap_id);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $parsed = FederatedHtml::extractTrailingHashtags(FederatedHtml::toText($doc['content'] ?? null));
+            if ($parsed['text'] === '') {
+                continue;
+            }
+            $post->message = $parsed['text'];
+            $post->save(false);
+            $this->attachTopics($post, $parsed['tags']);
+            $count++;
+        }
+        $this->stdout("Reprocessed {$count} remote posts.\n");
+        return ExitCode::OK;
+    }
+
+    /** Find-or-create the given tag names as topics in the post's container and attach them. */
+    private function attachTopics(\humhub\modules\post\models\Post $post, array $tagNames): void
+    {
+        if ($tagNames === []) {
+            return;
+        }
+        $content = $post->content;
+        $models = [];
+        foreach ($tagNames as $name) {
+            $name = trim(mb_substr((string) $name, 0, 100));
+            if ($name === '') {
+                continue;
+            }
+            $topic = \humhub\modules\topic\models\Topic::find()
+                ->where(['name' => $name, 'contentcontainer_id' => $content->contentcontainer_id])->one();
+            if ($topic === null) {
+                $topic = new \humhub\modules\topic\models\Topic([
+                    'name' => $name,
+                    'contentcontainer_id' => $content->contentcontainer_id,
+                ]);
+                if (!$topic->save()) {
+                    continue;
+                }
+            }
+            $models[] = $topic;
+        }
+        if ($models !== []) {
+            (new \humhub\modules\content\services\ContentTagService($content))->addTags($models);
+        }
+    }
+
     /** Usage: php protected/yii fediverse/ensure-instance-actor */
     public function actionEnsureInstanceActor(): int
     {

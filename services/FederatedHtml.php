@@ -25,4 +25,60 @@ class FederatedHtml
         $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
         return trim($text);
     }
+
+    /**
+     * Split a trailing block of hashtag-only lines off a post body (the common
+     * Mastodon style where #tags are appended at the end). Returns
+     * ['text' => bodyWithoutTrailingTags, 'tags' => [names...]]. Inline hashtags
+     * (lines that also contain normal words, e.g. "I am #blue") are left untouched.
+     * If the whole body is hashtags, nothing is extracted (body kept intact).
+     *
+     * @return array{text:string,tags:string[]}
+     */
+    public static function extractTrailingHashtags(string $text): array
+    {
+        $lines = preg_split('/\r\n|\r|\n/', $text) ?: [$text];
+        $collected = [];
+        while ($lines !== []) {
+            $line = trim((string) end($lines));
+            if ($line === '') {
+                array_pop($lines); // skip trailing blank line
+                continue;
+            }
+            $tokens = preg_split('/\s+/', $line) ?: [];
+            $lineTags = [];
+            $allTags = true;
+            foreach ($tokens as $tok) {
+                if (preg_match('/^#([\p{L}\p{N}_]+)$/u', $tok, $m)) {
+                    $lineTags[] = $m[1];
+                } else {
+                    $allTags = false;
+                    break;
+                }
+            }
+            if (!$allTags || $lineTags === []) {
+                break; // first non-hashtag line → stop
+            }
+            $collected = array_merge($lineTags, $collected); // prepend (scanning upward)
+            array_pop($lines);
+        }
+
+        // De-duplicate case-insensitively, keep first spelling.
+        $seen = [];
+        $tags = [];
+        foreach ($collected as $t) {
+            $k = mb_strtolower($t);
+            if (!isset($seen[$k])) {
+                $seen[$k] = true;
+                $tags[] = $t;
+            }
+        }
+
+        $cleaned = rtrim(implode("\n", $lines));
+        if ($cleaned === '') {
+            // Whole body was hashtags — keep it as-is rather than emptying the post.
+            return ['text' => trim($text), 'tags' => []];
+        }
+        return ['text' => $cleaned, 'tags' => $tags];
+    }
 }

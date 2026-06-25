@@ -3,12 +3,14 @@
 namespace humhub\modules\fediverse\jobs;
 
 use humhub\modules\comment\models\Comment;
+use humhub\modules\content\services\ContentTagService;
 use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\FederationObject;
 use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\models\RemoteActor;
 use humhub\modules\file\models\File;
 use humhub\modules\post\models\Post;
+use humhub\modules\topic\models\Topic;
 use humhub\modules\fediverse\services\FederatedHtml;
 use humhub\modules\fediverse\services\InboundInteractionService;
 use humhub\modules\fediverse\services\LocalObjectResolver;
@@ -457,8 +459,9 @@ class ProcessInboxActivity extends ActiveJob
             return;
         }
 
+        $parsed = FederatedHtml::extractTrailingHashtags(FederatedHtml::toText($note['content'] ?? null));
         $post = new \humhub\modules\post\models\Post($shadow, \humhub\modules\content\models\Content::VISIBILITY_PUBLIC, [
-            'message' => FederatedHtml::toText($note['content'] ?? null),
+            'message' => $parsed['text'],
         ]);
         $post->created_by = $shadow->id;
         $post->autoFollow = false;
@@ -482,7 +485,36 @@ class ProcessInboxActivity extends ActiveJob
         $obj->model_id = $post->id;
         $obj->save();
 
+        $this->attachTopics($post, $parsed['tags']);
         $this->attachRemoteImages($post, $note);
+    }
+
+    /** Attach the parsed trailing hashtags as HumHub topics to the ingested post. */
+    private function attachTopics(Post $post, array $tagNames): void
+    {
+        if ($tagNames === []) {
+            return;
+        }
+        $content = $post->content;
+        $models = [];
+        foreach ($tagNames as $name) {
+            $name = trim(mb_substr((string) $name, 0, 100));
+            if ($name === '') {
+                continue;
+            }
+            // Find-or-create per name within this container (dedupe; no permission gate).
+            $topic = Topic::find()->where(['name' => $name, 'contentcontainer_id' => $content->contentcontainer_id])->one();
+            if ($topic === null) {
+                $topic = new Topic(['name' => $name, 'contentcontainer_id' => $content->contentcontainer_id]);
+                if (!$topic->save()) {
+                    continue;
+                }
+            }
+            $models[] = $topic;
+        }
+        if ($models !== []) {
+            (new ContentTagService($post->content))->addTags($models);
+        }
     }
 
     private const MAX_ATTACHMENTS = 8;

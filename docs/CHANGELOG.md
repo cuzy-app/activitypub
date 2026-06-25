@@ -108,6 +108,10 @@
 - Enh: Federated users are collected in a dedicated "Remote Users" group (new
   shadow users join automatically, existing ones are backfilled), so the People
   directory can later be filtered by local vs. remote.
+- Enh: A trailing block of hashtags on an ingested remote post (the common
+  Mastodon style, e.g. a final line of `#a #b #c`) is split off the body and
+  turned into HumHub topics; hashtags used inline in a sentence are left in the
+  text.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

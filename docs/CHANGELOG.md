@@ -75,6 +75,9 @@
   federation client disables curl auto-redirects for SSRF safety, so the redirect
   is followed manually with each target re-validated as a safe public HTTPS URL;
   previously such accounts failed to resolve with a 3xx error.
+- Fix: The Fediverse engagement line under a remote post (favourite/boost counts)
+  is now rendered at the small wall-entry-controls size; the count texts are not
+  links, so they did not pick up the `11px` link styling and appeared too large.
 - Fix: The actor `following` and `followers` collections are now served as paged
   `OrderedCollection`s. The actor document advertised these URLs but they returned
   404, so remote servers (e.g. Mastodon) could not read the real counts and showed

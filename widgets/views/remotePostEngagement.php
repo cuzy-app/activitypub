@@ -15,4 +15,4 @@ if ($shares !== null) {
 }
 $parts[] = Html::a(Yii::t('FediverseModule.base', 'Open original') . ' ↗', $url, ['target' => '_blank', 'rel' => 'noopener']);
 ?>
-<span class="text-muted"><?= implode(' &middot; ', $parts); ?></span>
+<span class="text-muted" style="font-size:11px;"><?= implode(' &middot; ', $parts); ?></span>

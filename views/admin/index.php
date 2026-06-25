@@ -7,6 +7,7 @@ use yii\helpers\Html;
 
 /* @var $this \humhub\components\View */
 /* @var $model ConfigureForm */
+/* @var $stats array */
 ?>
 <div class="panel panel-default">
     <div class="panel-heading"><?= Yii::t('FediverseModule.base', 'Fediverse'); ?></div>
@@ -25,5 +26,19 @@ use yii\helpers\Html;
 
         <hr>
         <p><?= Html::a(Yii::t('FediverseModule.base', 'View federation activity log'), ['/fediverse/admin/activity-log'], ['class' => 'btn btn-default btn-sm']); ?></p>
+    </div>
+</div>
+
+<div class="panel panel-default">
+    <div class="panel-heading"><?= Yii::t('FediverseModule.base', 'Statistics'); ?></div>
+    <div class="panel-body">
+        <table class="table table-sm">
+            <?php foreach ($stats as $label => $value) : ?>
+                <tr>
+                    <th style="width:55%;"><?= Html::encode((string) $label); ?></th>
+                    <td><?= Html::encode((string) $value); ?></td>
+                </tr>
+            <?php endforeach; ?>
+        </table>
     </div>
 </div>

@@ -115,6 +115,8 @@
 - Enh: An opt-in "federation activity log" (admin setting, off by default) records
   recent inbound/outbound activities (raw JSON + outcome) to a capped table, with
   an admin viewer — useful for debugging e.g. mis-parsed remote content.
+- Enh: The Fediverse admin page shows basic statistics — local/remote actors,
+  inbound/outbound follow counts, and federated vs. ingested post counts.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

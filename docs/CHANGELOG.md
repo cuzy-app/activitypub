@@ -70,6 +70,11 @@
   mode (e.g. `newsie.social`) reject unsigned GETs with 401, which previously made
   following or resolving those accounts fail; the same signed fetch also lets us
   retrieve signer keys from secure-mode instances when verifying inbound activities.
+- Fix: WebFinger lookups now follow HTTP redirects (e.g. an apex domain delegating
+  to the real instance, such as `vivaldi.net` → `social.vivaldi.net`). The
+  federation client disables curl auto-redirects for SSRF safety, so the redirect
+  is followed manually with each target re-validated as a safe public HTTPS URL;
+  previously such accounts failed to resolve with a 3xx error.
 - Fix: The actor `following` and `followers` collections are now served as paged
   `OrderedCollection`s. The actor document advertised these URLs but they returned
   404, so remote servers (e.g. Mastodon) could not read the real counts and showed

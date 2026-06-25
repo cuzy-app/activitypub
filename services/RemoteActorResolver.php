@@ -122,6 +122,58 @@ class RemoteActorResolver
             ->send();
     }
 
+    /**
+     * GET a WebFinger document, following up to 3 redirects manually (the federation
+     * client disables curl auto-redirects for SSRF safety). Each redirect target is
+     * re-validated as a safe public HTTPS URL. WebFinger delegation via redirect is
+     * common — e.g. an apex domain pointing at the actual instance.
+     *
+     * @return \yii\httpclient\Response
+     */
+    private function webfingerGet(string $url)
+    {
+        for ($i = 0; $i < 4; $i++) {
+            if (!UrlSafety::isSafePublicUrl($url)) {
+                throw new RuntimeException('Refusing to fetch unsafe URL: ' . $url);
+            }
+            $response = (new FederationHttpClient())->createRequest()
+                ->setMethod('GET')
+                ->setUrl($url)
+                ->addHeaders(['Accept' => 'application/jrd+json, application/json'])
+                ->send();
+            $status = (int) $response->getStatusCode();
+            if ($status < 300 || $status >= 400) {
+                return $response;
+            }
+            $location = $response->getHeaders()->get('location');
+            if (!is_string($location) || $location === '') {
+                return $response; // redirect without a target — let the caller handle the non-2xx
+            }
+            $url = self::absoluteUrl($url, $location);
+        }
+        throw new RuntimeException('Too many WebFinger redirects');
+    }
+
+    /** Resolve a (possibly relative) redirect Location against the request URL. */
+    private static function absoluteUrl(string $base, string $location): string
+    {
+        if (preg_match('#^https?://#i', $location)) {
+            return $location;
+        }
+        $b = parse_url($base);
+        $scheme = $b['scheme'] ?? 'https';
+        $host = $b['host'] ?? '';
+        if (str_starts_with($location, '//')) {
+            return $scheme . ':' . $location;
+        }
+        if (str_starts_with($location, '/')) {
+            return $scheme . '://' . $host . $location;
+        }
+        $path = $b['path'] ?? '/';
+        $dir = substr($path, 0, (int) strrpos($path, '/') + 1);
+        return $scheme . '://' . $host . $dir . $location;
+    }
+
     /** Best-effort re-fetch of the actor: profile fields, images, and follower/following counts. */
     public function refresh(RemoteActor $remote): void
     {
@@ -331,12 +383,7 @@ class RemoteActorResolver
             throw new RuntimeException('Invalid or unsafe handle: ' . $handle);
         }
 
-        $client = new FederationHttpClient();
-        $response = $client->createRequest()
-            ->setMethod('GET')
-            ->setUrl($wf)
-            ->addHeaders(['Accept' => 'application/jrd+json, application/json'])
-            ->send();
+        $response = $this->webfingerGet($wf);
         if (!$response->getIsOk()) {
             throw new RuntimeException('WebFinger lookup failed (' . $response->getStatusCode() . '): ' . $handle);
         }

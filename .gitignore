@@ -10,3 +10,8 @@
 
 # OS
 .DS_Store
+
+# Codeception generated artifacts
+tests/codeception/_output/
+tests/codeception/_support/_generated/
+tests/codeception/_support/UnitTester.php

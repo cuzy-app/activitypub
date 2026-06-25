@@ -8,6 +8,7 @@ use yii\helpers\Html;
 /* @var $handle string */
 /* @var $actorUrl string */
 /* @var $discoverable bool */
+/* @var $discoverabilityError ?string */
 /* @var $publishEnabled bool */
 /* @var $follows FederationFollow[] */
 ?>
@@ -23,7 +24,10 @@ use yii\helpers\Html;
     <?php if ($discoverable) : ?>
         <div class="alert alert-success"><?= Yii::t('FediverseModule.base', 'Your profile is discoverable — remote users can follow you.'); ?></div>
     <?php else : ?>
-        <div class="alert alert-warning"><?= Yii::t('FediverseModule.base', 'Your profile is not yet discoverable. To be followable from the Fediverse your profile visibility must be “Visible to all (including guests)”, and federation must be enabled for this site.'); ?></div>
+        <div class="alert alert-warning">
+            <?= Yii::t('FediverseModule.base', 'Your profile is not yet discoverable, so remote users cannot follow you.'); ?>
+            <?= Html::encode((string) $discoverabilityError); ?>
+        </div>
     <?php endif; ?>
 
     <hr>

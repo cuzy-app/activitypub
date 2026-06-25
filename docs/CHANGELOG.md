@@ -98,6 +98,13 @@
   Fediverse now works: WebFinger advertises the `subscribe` template and a new
   `/authorize_interaction` endpoint lets a logged-in user confirm and follow a
   remote account (by handle or profile URL) they discovered on another server.
+- Fix: The "your profile must be discoverable" notice (shown when following a
+  remote account or on the Fediverse settings page) now names the actual missing
+  prerequisite — federation disabled, guest access disabled site-wide, or the
+  user's own profile visibility — instead of always telling the user to make
+  their profile "visible to all". The old wording was a dead end when guest
+  access was off site-wide, because the "members+guests" visibility option is
+  then not even offered.
 - Fix: Federated text from remote servers (post bodies, comments, bios) keeps its
   paragraph/line breaks and decodes HTML entities (e.g. `&amp;` → `&`), instead of
   naive tag-stripping that ran paragraphs together and left entities visible.

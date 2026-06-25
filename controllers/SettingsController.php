@@ -48,6 +48,7 @@ class SettingsController extends Controller
             'handle' => '@' . FederationUrl::normalizeHandle($user->username) . '@' . FederationUrl::domain(),
             'actorUrl' => FederationUrl::actorUrl($user->guid),
             'discoverable' => DiscoveryPolicy::isDiscoverable($user),
+            'discoverabilityError' => DiscoveryPolicy::discoverabilityError($user),
             'publishEnabled' => (bool) $settings->get('federationEnabled', false),
             'follows' => $follows,
         ]);
@@ -67,8 +68,9 @@ class SettingsController extends Controller
     {
         $this->forcePostRequest();
         $user = Yii::$app->user->getIdentity();
-        if (!DiscoveryPolicy::isDiscoverable($user)) {
-            $this->view->error(Yii::t('FediverseModule.base', 'Your profile must be discoverable (visible to all, including guests) before you can follow remote accounts.'));
+        $discoverabilityError = DiscoveryPolicy::discoverabilityError($user);
+        if ($discoverabilityError !== null) {
+            $this->view->error($discoverabilityError);
             return $this->redirect(['index']);
         }
         $handle = (string) Yii::$app->request->post('handle', '');

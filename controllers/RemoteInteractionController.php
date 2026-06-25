@@ -33,11 +33,12 @@ class RemoteInteractionController extends Controller
         if ($user === null) {
             return $this->redirect(['/user/auth/login']);
         }
-        if (!DiscoveryPolicy::isDiscoverable($user)) {
+        $discoverabilityError = DiscoveryPolicy::discoverabilityError($user);
+        if ($discoverabilityError !== null) {
             return $this->render('authorize', [
                 'uri' => $uri,
                 'remote' => null,
-                'error' => Yii::t('FediverseModule.base', 'Your profile must be discoverable (visible to all, including guests) before you can follow remote accounts.'),
+                'error' => $discoverabilityError,
             ]);
         }
 

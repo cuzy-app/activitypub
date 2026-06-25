@@ -17,6 +17,9 @@ class FederatedUserSource extends BaseUserSource
 {
     public const ID = 'fediverse';
 
+    /** Name of the user group federated shadow users are assigned to (for People filtering). */
+    public const REMOTE_GROUP_NAME = 'Remote Users';
+
     public string $id = self::ID;
     public string $title = 'Fediverse';
     public array $managedAttributes = ['firstname', 'lastname', 'about'];

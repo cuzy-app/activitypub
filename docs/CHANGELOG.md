@@ -105,6 +105,9 @@
   retryable job that retries transient failures (5xx / connection errors, up to 3
   attempts) and drops permanent ones (4xx/410), without re-delivering to inboxes
   that already succeeded. The inbound inbox has a per-IP rate-limit backstop.
+- Enh: Federated users are collected in a dedicated "Remote Users" group (new
+  shadow users join automatically, existing ones are backfilled), so the People
+  directory can later be filtered by local vs. remote.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

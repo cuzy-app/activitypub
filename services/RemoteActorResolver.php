@@ -3,6 +3,7 @@
 namespace humhub\modules\fediverse\services;
 
 use humhub\modules\fediverse\models\RemoteActor;
+use humhub\modules\user\models\Group;
 use humhub\modules\user\models\User;
 use RuntimeException;
 use Yii;
@@ -221,6 +222,12 @@ class RemoteActorResolver
         $defaultGroup = Yii::$app->getModule('user')->getDefaultGroup();
         if ($defaultGroup !== null) {
             $defaultGroup->addUser($user);
+        }
+
+        // Categorise federated users in the "Remote Users" group (for People filtering).
+        $remoteGroup = Group::find()->where(['name' => FederatedUserSource::REMOTE_GROUP_NAME])->one();
+        if ($remoteGroup !== null) {
+            $remoteGroup->addUser($user);
         }
 
         $this->applyProfileImages($user, $doc);

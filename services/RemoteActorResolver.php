@@ -226,10 +226,13 @@ class RemoteActorResolver
             $defaultGroup->addUser($user);
         }
 
-        // Categorise federated users in the "Remote Users" group (for People filtering).
-        $remoteGroup = Group::find()->where(['name' => FederatedUserSource::REMOTE_GROUP_NAME])->one();
-        if ($remoteGroup !== null) {
-            $remoteGroup->addUser($user);
+        // Categorise federated users in the admin-configured group (for People filtering).
+        $groupId = (int) Yii::$app->getModule('fediverse')->settings->get('remoteUserGroupId', 0);
+        if ($groupId > 0) {
+            $group = Group::findOne($groupId);
+            if ($group !== null) {
+                $group->addUser($user);
+            }
         }
 
         $this->applyProfileImages($user, $doc);

@@ -105,9 +105,10 @@
   retryable job that retries transient failures (5xx / connection errors, up to 3
   attempts) and drops permanent ones (4xx/410), without re-delivering to inboxes
   that already succeeded. The inbound inbox has a per-IP rate-limit backstop.
-- Enh: Federated users are collected in a dedicated "Remote Users" group (new
-  shadow users join automatically, existing ones are backfilled), so the People
-  directory can later be filtered by local vs. remote.
+- Enh: Federated users are collected in a group (new shadow users join
+  automatically, existing ones are backfilled), so the People directory can later
+  be filtered by local vs. remote. A default "Remote Users" group is created, and
+  the target group is selectable in the Fediverse admin settings.
 - Enh: A trailing block of hashtags on an ingested remote post (the common
   Mastodon style, e.g. a final line of `#a #b #c`) is split off the body and
   turned into HumHub topics; hashtags used inline in a sentence are left in the

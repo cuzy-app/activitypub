@@ -21,6 +21,9 @@ use yii\helpers\Html;
         <?php $form = ActiveForm::begin(); ?>
             <?= $form->field($model, 'enabled')->checkbox(); ?>
             <?= $form->field($model, 'activityLogEnabled')->checkbox(); ?>
+            <?= $form->field($model, 'remoteUserGroupId')
+                ->dropDownList($model->getGroupOptions(), ['prompt' => Yii::t('FediverseModule.base', '(none)')])
+                ->hint(Yii::t('FediverseModule.base', 'Federated (remote) users are added to this group, so the People directory can be filtered by local vs. remote.')); ?>
             <?= Button::save()->submit(); ?>
         <?php ActiveForm::end(); ?>
 

@@ -650,6 +650,13 @@ class Events
         $userModule = Yii::$app->getModule('user');
         $userModule->displayNameCallback = [self::class, 'displayName'];
         $userModule->displayNameSubCallback = [self::class, 'displayNameSub'];
+
+        // Render Mastodon custom-emoji (markdown images whose alt is a ":code:") at text size.
+        Yii::$app->view->registerCss(
+            'img[alt^=":"][alt$=":"]{height:1.4em;width:auto;vertical-align:middle;margin:0 1px;}',
+            [],
+            'fediverse-custom-emoji'
+        );
     }
 
     /** Federated users → their Fediverse display name (fallback handle/username); others → HumHub default. */

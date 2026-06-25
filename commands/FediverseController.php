@@ -116,7 +116,7 @@ class FediverseController extends Controller
             if ($parsed['text'] === '') {
                 continue;
             }
-            $post->message = $parsed['text'];
+            $post->message = FederatedHtml::applyCustomEmoji($parsed['text'], $doc['tag'] ?? []);
             $post->save(false);
             $this->attachTopics($post, $parsed['tags']);
             $count++;

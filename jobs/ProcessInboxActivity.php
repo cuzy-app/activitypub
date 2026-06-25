@@ -464,8 +464,9 @@ class ProcessInboxActivity extends ActiveJob
         }
 
         $parsed = FederatedHtml::extractTrailingHashtags(FederatedHtml::toText($note['content'] ?? null));
+        $message = FederatedHtml::applyCustomEmoji($parsed['text'], $note['tag'] ?? []);
         $post = new \humhub\modules\post\models\Post($shadow, \humhub\modules\content\models\Content::VISIBILITY_PUBLIC, [
-            'message' => $parsed['text'],
+            'message' => $message,
         ]);
         $post->created_by = $shadow->id;
         $post->autoFollow = false;

@@ -81,4 +81,38 @@ class FederatedHtml
         }
         return ['text' => $cleaned, 'tags' => $tags];
     }
+
+    /** Map of custom-emoji shortcode (":code:") => icon URL, from an activity/object `tag[]`. */
+    private static function customEmojiMap(array $tags): array
+    {
+        $map = [];
+        foreach ($tags as $t) {
+            if (is_array($t) && ($t['type'] ?? '') === 'Emoji') {
+                $name = (string) ($t['name'] ?? '');
+                $url = is_array($t['icon'] ?? null) ? ($t['icon']['url'] ?? null) : null;
+                if ($name !== '' && is_string($url) && $url !== '') {
+                    $map[$name] = $url;
+                }
+            }
+        }
+        return $map;
+    }
+
+    /** Replace Mastodon custom-emoji shortcodes with inline images (for RichText content like post bodies). */
+    public static function applyCustomEmoji(string $text, array $tags): string
+    {
+        foreach (self::customEmojiMap($tags) as $code => $url) {
+            $text = str_replace($code, '![' . $code . '](' . $url . ')', $text);
+        }
+        return $text;
+    }
+
+    /** Remove custom-emoji shortcodes (for plain contexts that can't render images, e.g. display names). */
+    public static function stripCustomEmoji(string $text, array $tags): string
+    {
+        foreach (array_keys(self::customEmojiMap($tags)) as $code) {
+            $text = str_replace($code, '', $text);
+        }
+        return trim(preg_replace('/\s{2,}/', ' ', $text) ?? $text);
+    }
 }

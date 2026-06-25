@@ -120,6 +120,10 @@
 - Enh: The Fediverse settings page notes that liking or commenting on federated
   content is itself federated (delivered to the remote author and publicly
   visible there).
+- Enh: Mastodon custom emoji are handled — in an ingested post body the
+  `:shortcode:` is rendered as the emoji image (from the activity's `tag`), and in
+  federated display names (which can't show images) the shortcodes are stripped
+  rather than shown raw.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

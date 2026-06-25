@@ -128,6 +128,7 @@ class RemoteActorResolver
         $profile = $user->profile;
         if ($profile !== null) {
             $name = trim((string) ($doc['name'] ?? '')) ?: (string) ($remote->preferred_username ?? '');
+            $name = FederatedHtml::stripCustomEmoji($name, $doc['tag'] ?? []);
             if ($name !== '') {
                 $profile->fediverse_displayname = mb_substr($name, 0, 255);
             }
@@ -185,6 +186,7 @@ class RemoteActorResolver
         $domain = (string) parse_url($actorUrl, PHP_URL_HOST);
         $preferred = isset($doc['preferredUsername']) ? (string) $doc['preferredUsername'] : 'user';
         $name = trim((string) ($doc['name'] ?? '')) ?: $preferred;
+        $name = FederatedHtml::stripCustomEmoji($name, $doc['tag'] ?? []) ?: $preferred; // names can't render emoji images
 
         $user = new User();
         $user->user_source = FederatedUserSource::ID; // governs: email optional, no self-delete, managed attrs

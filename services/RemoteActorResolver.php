@@ -68,12 +68,7 @@ class RemoteActorResolver
             throw new RuntimeException('Refusing to fetch unsafe URL: ' . $actorUrl);
         }
 
-        $client = new FederationHttpClient();
-        $response = $client->createRequest()
-            ->setMethod('GET')
-            ->setUrl($actorUrl)
-            ->addHeaders(['Accept' => 'application/activity+json'])
-            ->send();
+        $response = $this->signedGet($actorUrl);
 
         if (!$response->getIsOk()) {
             throw new RuntimeException('Actor fetch failed (' . $response->getStatusCode() . '): ' . $actorUrl);
@@ -84,6 +79,47 @@ class RemoteActorResolver
             throw new RuntimeException('Invalid actor document: ' . $actorUrl);
         }
         return $data;
+    }
+
+    /**
+     * GET signed by the instance actor (draft-cavage HTTP Signature over
+     * (request-target) host date). Instances in "authorized fetch" / secure mode
+     * reject unsigned actor/object GETs with 401; signing is harmless to instances
+     * that do not require it.
+     *
+     * @return \yii\httpclient\Response
+     */
+    private function signedGet(string $url)
+    {
+        $parts = parse_url($url);
+        $host = $parts['host'] ?? '';
+        $path = ($parts['path'] ?? '/') . (isset($parts['query']) ? '?' . $parts['query'] : '');
+        $date = gmdate('D, d M Y H:i:s') . ' GMT';
+
+        $signer = (new KeyManager())->getOrCreateInstanceActor();
+        $signatures = new SignatureService();
+        $headerList = ['(request-target)', 'host', 'date'];
+        $signingString = $signatures->buildSigningString('GET', $path, [
+            'host' => $host,
+            'date' => $date,
+        ], $headerList);
+        $signatureHeader = sprintf(
+            'keyId="%s#main-key",algorithm="rsa-sha256",headers="%s",signature="%s"',
+            $signer->ap_id,
+            implode(' ', $headerList),
+            $signatures->signString($signingString, (string) $signer->private_key)
+        );
+
+        return (new FederationHttpClient())->createRequest()
+            ->setMethod('GET')
+            ->setUrl($url)
+            ->addHeaders([
+                'Host' => $host,
+                'Date' => $date,
+                'Accept' => 'application/activity+json',
+                'Signature' => $signatureHeader,
+            ])
+            ->send();
     }
 
     /** Best-effort re-fetch of the actor: profile fields, images, and follower/following counts. */
@@ -147,11 +183,7 @@ class RemoteActorResolver
             return null;
         }
         try {
-            $response = (new FederationHttpClient())->createRequest()
-                ->setMethod('GET')
-                ->setUrl($url)
-                ->addHeaders(['Accept' => 'application/activity+json'])
-                ->send();
+            $response = $this->signedGet($url);
             if (!$response->getIsOk()) {
                 return null;
             }

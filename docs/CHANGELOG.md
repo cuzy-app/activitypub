@@ -65,6 +65,11 @@
   advertises `first`/`last` and `?page=N` returns an `OrderedCollectionPage` of
   the user's `Create` activities (newest first) with `next`/`prev`; previously the
   page link was advertised but never served the items.
+- Fix: Outbound actor/object/collection fetches are now HTTP-signed by the
+  instance actor ("signed fetch"). Instances running in authorized-fetch / secure
+  mode (e.g. `newsie.social`) reject unsigned GETs with 401, which previously made
+  following or resolving those accounts fail; the same signed fetch also lets us
+  retrieve signer keys from secure-mode instances when verifying inbound activities.
 - Fix: The actor `following` and `followers` collections are now served as paged
   `OrderedCollection`s. The actor document advertised these URLs but they returned
   404, so remote servers (e.g. Mastodon) could not read the real counts and showed

@@ -3,3 +3,10 @@
 
 # Playwright MCP output
 .playwright-mcp/
+
+# IDE / editor
+.idea/
+*.iml
+
+# OS
+.DS_Store

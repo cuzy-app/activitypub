@@ -136,8 +136,7 @@
   (`@user@domain`) in the `fediverse_handle` profile field, kept in sync on
   creation and username change, so it can be shown as the display-name subtitle
   (Administration → Settings → Appearance → "User Display Name Subtitle" →
-  "Fediverse Handle"). The `fediverse/backfill-local-handles` console command
-  fills it in for existing users.
+  "Fediverse Handle").
 - Fix: The module no longer clobbers a `displayNameCallback` /
   `displayNameSubCallback` configured elsewhere (e.g. in `config.php`). It now
   preserves and delegates to it for non-federated users, while still rendering

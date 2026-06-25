@@ -11,6 +11,7 @@ use humhub\modules\fediverse\models\RemoteActor;
 use humhub\modules\file\models\File;
 use humhub\modules\post\models\Post;
 use humhub\modules\topic\models\Topic;
+use humhub\modules\fediverse\services\ActivityLog;
 use humhub\modules\fediverse\services\FederatedHtml;
 use humhub\modules\fediverse\services\InboundInteractionService;
 use humhub\modules\fediverse\services\LocalObjectResolver;
@@ -54,6 +55,7 @@ class ProcessInboxActivity extends ActiveJob
         $signerDoc = $this->authenticate($actorUrl);
         if ($signerDoc === null) {
             Yii::warning('Fediverse inbox: authentication failed for ' . $actorUrl, 'fediverse');
+            ActivityLog::record('in', $activity['type'] ?? null, $actorUrl, $this->rawBody, 'rejected', 'signature/verification failed');
             return;
         }
         $signerId = (string) ($signerDoc['id'] ?? $actorUrl);
@@ -83,6 +85,8 @@ class ProcessInboxActivity extends ActiveJob
             default:
                 Yii::info('Fediverse inbox: ignoring unsupported type ' . $activity['type'], 'fediverse');
         }
+
+        ActivityLog::record('in', $activity['type'], $actorUrl, $this->rawBody, 'processed');
     }
 
     /**

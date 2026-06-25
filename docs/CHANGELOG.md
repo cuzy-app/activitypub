@@ -112,6 +112,9 @@
   Mastodon style, e.g. a final line of `#a #b #c`) is split off the body and
   turned into HumHub topics; hashtags used inline in a sentence are left in the
   text.
+- Enh: An opt-in "federation activity log" (admin setting, off by default) records
+  recent inbound/outbound activities (raw JSON + outcome) to a capped table, with
+  an admin viewer — useful for debugging e.g. mis-parsed remote content.
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).

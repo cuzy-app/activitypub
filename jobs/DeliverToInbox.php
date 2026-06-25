@@ -4,6 +4,7 @@ namespace humhub\modules\fediverse\jobs;
 
 use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\services\ActivityDelivery;
+use humhub\modules\fediverse\services\ActivityLog;
 use humhub\modules\fediverse\services\UrlSafety;
 use humhub\modules\queue\ActiveJob;
 use RuntimeException;
@@ -49,14 +50,18 @@ class DeliverToInbox extends ActiveJob implements RetryableJobInterface
         // queue retries it (transient).
         $status = (new ActivityDelivery())->deliver($signer, $this->inboxUrl, $activity);
 
+        $type = $activity['type'] ?? null;
         if ($status >= 200 && $status < 300) {
+            ActivityLog::record('out', $type, $this->inboxUrl, $this->activityJson, 'delivered');
             return; // delivered
         }
         if ($status >= 400 && $status < 500) {
             Yii::warning('Fediverse delivery ' . $status . ' (permanent) to ' . $this->inboxUrl, 'fediverse');
+            ActivityLog::record('out', $type, $this->inboxUrl, $this->activityJson, 'failed_permanent', (string) $status);
             return; // 4xx incl. 410 Gone — do not retry
         }
         // 5xx / other → transient: throw so the queue retries per canRetry().
+        ActivityLog::record('out', $type, $this->inboxUrl, $this->activityJson, 'failed_transient', (string) $status);
         throw new RuntimeException('Fediverse delivery transient failure (' . $status . ') to ' . $this->inboxUrl);
     }
 }

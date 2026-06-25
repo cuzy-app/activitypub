@@ -3,6 +3,7 @@
 use humhub\widgets\bootstrap\Button;
 use humhub\widgets\form\ActiveForm;
 use humhub\modules\fediverse\models\ConfigureForm;
+use yii\helpers\Html;
 
 /* @var $this \humhub\components\View */
 /* @var $model ConfigureForm */
@@ -18,7 +19,11 @@ use humhub\modules\fediverse\models\ConfigureForm;
 
         <?php $form = ActiveForm::begin(); ?>
             <?= $form->field($model, 'enabled')->checkbox(); ?>
+            <?= $form->field($model, 'activityLogEnabled')->checkbox(); ?>
             <?= Button::save()->submit(); ?>
         <?php ActiveForm::end(); ?>
+
+        <hr>
+        <p><?= Html::a(Yii::t('FediverseModule.base', 'View federation activity log'), ['/fediverse/admin/activity-log'], ['class' => 'btn btn-default btn-sm']); ?></p>
     </div>
 </div>

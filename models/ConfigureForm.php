@@ -11,10 +11,13 @@ class ConfigureForm extends Model
     /** @var bool global on/off switch for all federation */
     public $enabled = false;
 
+    /** @var bool opt-in debug log of inbound/outbound activities */
+    public $activityLogEnabled = false;
+
     public function rules()
     {
         return [
-            [['enabled'], 'boolean'],
+            [['enabled', 'activityLogEnabled'], 'boolean'],
         ];
     }
 
@@ -22,12 +25,14 @@ class ConfigureForm extends Model
     {
         return [
             'enabled' => Yii::t('FediverseModule.base', 'Enable federation for this site'),
+            'activityLogEnabled' => Yii::t('FediverseModule.base', 'Log federation activity (debug)'),
         ];
     }
 
     public function loadSettings(): self
     {
         $this->enabled = (bool) $this->getModule()->settings->get('enabled', false);
+        $this->activityLogEnabled = (bool) $this->getModule()->settings->get('activityLogEnabled', false);
         return $this;
     }
 
@@ -37,6 +42,7 @@ class ConfigureForm extends Model
             return false;
         }
         $this->getModule()->settings->set('enabled', (bool) $this->enabled);
+        $this->getModule()->settings->set('activityLogEnabled', (bool) $this->activityLogEnabled);
         return true;
     }
 

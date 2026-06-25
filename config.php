@@ -14,6 +14,8 @@ return [
         ['class' => 'humhub\modules\like\models\Like', 'event' => 'beforeDelete', 'callback' => ['humhub\modules\fediverse\Events', 'onLikeRemoved']],
         ['class' => 'humhub\modules\comment\models\Comment', 'event' => 'afterInsert', 'callback' => ['humhub\modules\fediverse\Events', 'onCommentCreated']],
         ['class' => 'humhub\modules\user\models\Profile', 'event' => 'afterUpdate', 'callback' => ['humhub\modules\fediverse\Events', 'onProfileUpdated']],
+        ['class' => 'humhub\modules\user\models\Profile', 'event' => 'afterInsert', 'callback' => ['humhub\modules\fediverse\Events', 'onProfileAfterInsert']],
+        ['class' => 'humhub\modules\user\models\User', 'event' => 'afterUpdate', 'callback' => ['humhub\modules\fediverse\Events', 'onUserAfterUpdate']],
         ['class' => 'humhub\modules\user\controllers\ImageController', 'event' => 'afterAction', 'callback' => ['humhub\modules\fediverse\Events', 'onProfileImageChanged']],
         ['class' => 'humhub\modules\user\widgets\AccountMenu', 'event' => 'init', 'callback' => ['humhub\modules\fediverse\Events', 'onAccountMenuInit']],
         ['class' => 'humhub\modules\user\widgets\ProfileMenu', 'event' => 'init', 'callback' => ['humhub\modules\fediverse\Events', 'onProfileMenuInit']],

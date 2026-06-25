@@ -128,6 +128,18 @@
 - Enh: The Fediverse settings page notes that liking or commenting on federated
   content is itself federated (delivered to the remote author and publicly
   visible there).
+- Enh: Local users now also carry their canonical Fediverse handle
+  (`@user@domain`) in the `fediverse_handle` profile field, kept in sync on
+  creation and username change, so it can be shown as the display-name subtitle
+  (Administration → Settings → Appearance → "User Display Name Subtitle" →
+  "Fediverse Handle"). The `fediverse/backfill-local-handles` console command
+  fills it in for existing users.
+- Fix: The module no longer clobbers a `displayNameCallback` /
+  `displayNameSubCallback` configured elsewhere (e.g. in `config.php`). It now
+  preserves and delegates to it for non-federated users, while still rendering
+  federated users from their Fediverse fields — so a site can customise the
+  local display name (e.g. from a `display_name` profile field) and have it
+  applied to local users and federated outbound (`Person.name`) alike.
 - Enh: Mastodon custom emoji are handled — in an ingested post body the
   `:shortcode:` is rendered as the emoji image (from the activity's `tag`), and in
   federated display names (which can't show images) the shortcodes are stripped

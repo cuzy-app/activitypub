@@ -156,6 +156,30 @@ class FediverseController extends Controller
         }
     }
 
+    /**
+     * Usage: php protected/yii fediverse/backfill-local-handles
+     * Stamps the canonical @user@domain Fediverse handle into the fediverse_handle
+     * profile field for every local user, so it can be shown as the display-name
+     * subtitle. New users and renames are kept in sync automatically by event
+     * handlers; this backfills existing users. Idempotent.
+     */
+    public function actionBackfillLocalHandles(): int
+    {
+        $count = 0;
+        foreach (User::find()->each() as $user) {
+            if ($user->user_source === FederatedUserSource::ID || $user->profile === null) {
+                continue;
+            }
+            $before = (string) $user->profile->fediverse_handle;
+            \humhub\modules\fediverse\Events::ensureLocalHandle($user);
+            if ((string) $user->profile->fediverse_handle !== $before) {
+                $count++;
+            }
+        }
+        $this->stdout("Backfilled {$count} local user handles.\n");
+        return ExitCode::OK;
+    }
+
     /** Usage: php protected/yii fediverse/ensure-instance-actor */
     public function actionEnsureInstanceActor(): int
     {

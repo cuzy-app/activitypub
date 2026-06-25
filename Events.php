@@ -644,10 +644,30 @@ class Events
         ]));
     }
 
+    /**
+     * Display-name callbacks configured elsewhere (e.g. config.php
+     * modules.user.displayNameCallback). Preserved so we delegate to them for
+     * non-federated users instead of clobbering them.
+     */
+    private static $previousDisplayNameCallback = null;
+    private static $previousDisplayNameSubCallback = null;
+
     /** Set the display-name callbacks so federated users render from their Fediverse fields. */
     public static function onBeforeRequest(): void
     {
         $userModule = Yii::$app->getModule('user');
+
+        // Capture any callback configured elsewhere (but never our own) so the
+        // non-federated branches below can defer to it rather than overriding it.
+        if ($userModule->displayNameCallback !== null
+            && $userModule->displayNameCallback !== [self::class, 'displayName']) {
+            self::$previousDisplayNameCallback = $userModule->displayNameCallback;
+        }
+        if ($userModule->displayNameSubCallback !== null
+            && $userModule->displayNameSubCallback !== [self::class, 'displayNameSub']) {
+            self::$previousDisplayNameSubCallback = $userModule->displayNameSubCallback;
+        }
+
         $userModule->displayNameCallback = [self::class, 'displayName'];
         $userModule->displayNameSubCallback = [self::class, 'displayNameSub'];
 
@@ -673,6 +693,11 @@ class Events
             $handle = trim((string) $user->profile->fediverse_handle);
             return $handle !== '' ? $handle : $user->username;
         }
+        // Non-federated users: defer to a callback configured elsewhere (e.g. config.php)
+        // which onBeforeRequest would otherwise have overwritten.
+        if (self::$previousDisplayNameCallback !== null) {
+            return (string) call_user_func(self::$previousDisplayNameCallback, $user);
+        }
         // HumHub default (mirrors User::getDisplayName)
         $name = '';
         if ($user->profile !== null && Yii::$app->settings->get('displayNameFormat') === '{profile.firstname} {profile.lastname}') {
@@ -690,7 +715,52 @@ class Events
         if ($user->user_source === FederatedUserSource::ID) {
             return trim((string) $user->profile->fediverse_handle);
         }
+        // Non-federated users: defer to a sub-callback configured elsewhere if present.
+        if (self::$previousDisplayNameSubCallback !== null) {
+            return (string) call_user_func(self::$previousDisplayNameSubCallback, $user);
+        }
         return $user->profile->getFieldValue(Yii::$app->settings->get('displayNameSubFormat', ''), false, false) ?? '';
+    }
+
+    /**
+     * Stamp the canonical Fediverse handle (@username@domain) into a LOCAL user's
+     * fediverse_handle profile field, so it can be shown as the display-name subtitle
+     * (Administration → Settings → Appearance → "User Display Name Subtitle" →
+     * "Fediverse Handle"). Federated shadow users are skipped — their handle comes from
+     * the remote actor. Written via updateAttributes so it does not re-fire profile
+     * save events (no recursion) and is a no-op when already correct.
+     */
+    public static function ensureLocalHandle(User $user): void
+    {
+        if ($user->user_source === FederatedUserSource::ID) {
+            return;
+        }
+        $profile = $user->profile;
+        if ($profile === null || trim((string) $user->username) === '') {
+            return;
+        }
+        $handle = mb_substr('@' . FederationUrl::normalizeHandle($user->username) . '@' . FederationUrl::domain(), 0, 255);
+        if ((string) $profile->fediverse_handle !== $handle) {
+            $profile->updateAttributes(['fediverse_handle' => $handle]);
+        }
+    }
+
+    /** New user → stamp their local @user@domain handle into the profile field. */
+    public static function onProfileAfterInsert($event): void
+    {
+        $profile = $event->sender;
+        if ($profile instanceof Profile && $profile->user !== null) {
+            self::ensureLocalHandle($profile->user);
+        }
+    }
+
+    /** Username change → keep the stored local handle in sync. */
+    public static function onUserAfterUpdate($event): void
+    {
+        $user = $event->sender;
+        if ($user instanceof User && array_key_exists('username', $event->changedAttributes ?? [])) {
+            self::ensureLocalHandle($user);
+        }
     }
 
     /** Register the Fediverse UserSource so it governs federated shadow users. */

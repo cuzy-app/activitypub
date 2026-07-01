@@ -5,9 +5,12 @@ namespace humhub\modules\fediverse\controllers;
 use humhub\components\Controller;
 use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\RemoteActor;
+use humhub\modules\fediverse\services\CommunityResolver;
+use humhub\modules\fediverse\services\CommunitySubscriptionService;
 use humhub\modules\fediverse\services\DiscoveryPolicy;
 use humhub\modules\fediverse\services\FederationUrl;
 use humhub\modules\fediverse\services\RemoteActorResolver;
+use humhub\modules\fediverse\services\UrlSafety;
 use humhub\modules\user\models\User;
 use Yii;
 
@@ -68,14 +71,36 @@ class SettingsController extends Controller
     {
         $this->forcePostRequest();
         $user = Yii::$app->user->getIdentity();
-        $discoverabilityError = DiscoveryPolicy::discoverabilityError($user);
-        if ($discoverabilityError !== null) {
-            $this->view->error($discoverabilityError);
-            return $this->redirect(['index']);
-        }
         $handle = (string) Yii::$app->request->post('handle', '');
         try {
-            $remote = (new RemoteActorResolver())->resolveByHandle($handle);
+            // Resolve the handle to its actor document WITHOUT persisting anything,
+            // so we can branch on the actor type before creating a shadow user.
+            $resolver = new RemoteActorResolver();
+            $wf = CommunityResolver::webfingerUrl($handle);
+            if ($wf === '' || !UrlSafety::isSafePublicUrl($wf)) {
+                throw new \RuntimeException(Yii::t('FediverseModule.base', 'Invalid handle: {handle}', ['handle' => $handle]));
+            }
+            $actorUrl = $resolver->webfingerActorUrl($wf);
+            $doc = $resolver->fetchActorDocument($actorUrl);
+
+            // A Lemmy-family community (Group) → provision/join its mirror Space.
+            // No shadow user is created; the Space's own Group actor sends the
+            // Follow, so the user does NOT need to be discoverable to subscribe.
+            if (($doc['type'] ?? '') === 'Group') {
+                $space = (new CommunitySubscriptionService())
+                    ->provisionOrJoin($user, $doc, (string) ($doc['id'] ?? $actorUrl), $handle);
+                $this->view->success(Yii::t('FediverseModule.base', 'Joined the community space “{name}”.', ['name' => $space->name]));
+                return $this->redirect($space->getUrl());
+            }
+
+            // A person (or other actor) → follow it as this user. This publishes an
+            // outbound Follow from the user's own actor, so require discoverability.
+            $discoverabilityError = DiscoveryPolicy::discoverabilityError($user);
+            if ($discoverabilityError !== null) {
+                $this->view->error($discoverabilityError);
+                return $this->redirect(['index']);
+            }
+            $remote = $resolver->resolveFromDocument($actorUrl, $doc);
             $shadow = User::findOne($remote->user_id);
             if ($shadow !== null) {
                 $shadow->follow($user->id); // fires Follow::EVENT_FOLLOWING_CREATED → outbound Follow

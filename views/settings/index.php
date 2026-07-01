@@ -49,11 +49,11 @@ use yii\helpers\Html;
 
     <hr>
 
-    <h4><?= Yii::t('FediverseModule.base', 'Follow a Fediverse account'); ?></h4>
-    <p><?= Yii::t('FediverseModule.base', 'Enter a handle like {example}. Their public posts will appear in your dashboard.', ['example' => '@user@mastodon.social']); ?></p>
+    <h4><?= Yii::t('FediverseModule.base', 'Follow a Fediverse account or community'); ?></h4>
+    <p><?= Yii::t('FediverseModule.base', 'Enter a person like {person} — their public posts appear in your dashboard — or a Lemmy community like {community} to join its mirrored Space.', ['person' => '@user@mastodon.social', 'community' => '!community@lemmy.world']); ?></p>
     <?= Html::beginForm(['follow']); ?>
         <div class="form-group">
-            <?= Html::textInput('handle', '', ['class' => 'form-control', 'placeholder' => '@user@domain']); ?>
+            <?= Html::textInput('handle', '', ['class' => 'form-control', 'placeholder' => '@user@domain or !community@domain']); ?>
         </div>
         <?= Button::primary(Yii::t('FediverseModule.base', 'Follow'))->submit(); ?>
     <?= Html::endForm(); ?>

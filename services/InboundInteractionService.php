@@ -4,10 +4,12 @@ namespace humhub\modules\fediverse\services;
 
 use humhub\models\RecordMap;
 use humhub\modules\comment\models\Comment;
+use humhub\modules\content\components\ContentActiveRecord;
 use humhub\modules\content\components\ContentAddonActiveRecord;
 use humhub\modules\content\interfaces\ContentProvider;
 use humhub\modules\content\models\Content;
 use humhub\modules\fediverse\models\FederationObject;
+use humhub\modules\file\models\File;
 use humhub\modules\like\models\Like;
 use humhub\modules\user\models\User;
 use Yii;
@@ -20,9 +22,16 @@ use Yii;
  */
 class InboundInteractionService
 {
-    /** Add a remote reply as a comment on the given content (idempotent by Note id). */
-    public function addComment(Content $content, User $author, string $contentHtml, string $noteApId): void
+    /**
+     * Add a remote Note as a comment on the given content (idempotent by Note id).
+     * Used both for replies to our own content and for the continuation parts of
+     * a remote multi-part post (self-reply thread), so each part keeps its own AP
+     * id mapping — that mapping is what lets a later Update/Delete of the part
+     * resolve back to this comment.
+     */
+    public function addRemoteComment(Content $content, User $author, array $note): void
     {
+        $noteApId = (string) ($note['id'] ?? '');
         if ($noteApId === '') {
             Yii::warning('Fediverse inbound comment dropped: Note has no id', 'fediverse');
             return; // an id-less Note cannot be de-duplicated; reject rather than risk duplicates
@@ -31,7 +40,8 @@ class InboundInteractionService
             return; // already processed
         }
 
-        $comment = new Comment(['message' => $this->toPlainText($contentHtml)]);
+        $message = FederatedHtml::applyCustomEmoji($this->toPlainText((string) ($note['content'] ?? '')), $note['tag'] ?? []);
+        $comment = new Comment(['message' => $message]);
         $comment->content_id = $content->id;
         $comment->created_by = $author->id;
         try {
@@ -44,6 +54,7 @@ class InboundInteractionService
             return;
         }
         $this->record($noteApId, 'Note', Comment::class, $comment->id);
+        $this->attachRemoteImages($comment, $note);
     }
 
     /** Add a like by the remote user on the given record — a post or a comment (idempotent). */
@@ -89,6 +100,51 @@ class InboundInteractionService
             ->one();
         if ($like !== null) {
             $like->delete();
+        }
+    }
+
+    private const MAX_ATTACHMENTS = 8;
+
+    /**
+     * Download a remote Note's image attachments and attach them to the ingested
+     * record (a Post or a Comment — both expose ->fileManager and ->content).
+     */
+    public function attachRemoteImages(ContentActiveRecord|ContentAddonActiveRecord $record, array $note): void
+    {
+        $attachments = $note['attachment'] ?? null;
+        if (!is_array($attachments)) {
+            return;
+        }
+        $fetcher = new RemoteMediaFetcher();
+        $count = 0;
+        foreach ($attachments as $att) {
+            if ($count >= self::MAX_ATTACHMENTS) {
+                break;
+            }
+            $url = is_array($att) ? ($att['url'] ?? null) : null;
+            if (!is_string($url)) {
+                continue;
+            }
+            $media = $fetcher->fetchImage($url);
+            if ($media === null) {
+                continue; // non-image / unsafe / too big / failed
+            }
+            try {
+                $file = new File();
+                $file->file_name = $fetcher->filenameFor($url, $media['mime']);
+                $file->mime_type = $media['mime'];
+                $file->size = strlen($media['content']);
+                $file->created_by = (int) $record->content->created_by; // shadow user; queue has no logged-in user
+                if (!$file->save()) {
+                    Yii::warning('Fediverse attachment File save failed: ' . implode(', ', $file->getErrorSummary(true)), 'fediverse');
+                    continue;
+                }
+                $file->setStoredFileContent($media['content']);
+                $record->fileManager->attach($file);
+                $count++;
+            } catch (\Throwable $e) {
+                Yii::warning('Fediverse attachment error for ' . $url . ': ' . $e->getMessage(), 'fediverse');
+            }
         }
     }
 

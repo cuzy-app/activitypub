@@ -6,9 +6,9 @@ use humhub\modules\comment\models\Comment;
 use humhub\modules\content\services\ContentTagService;
 use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\FederationObject;
+use humhub\modules\fediverse\models\SpaceCommunity;
 use humhub\modules\fediverse\models\LocalActor;
 use humhub\modules\fediverse\models\RemoteActor;
-use humhub\modules\file\models\File;
 use humhub\modules\post\models\Post;
 use humhub\modules\topic\models\Topic;
 use humhub\modules\fediverse\services\ActivityLog;
@@ -16,7 +16,7 @@ use humhub\modules\fediverse\services\FederatedHtml;
 use humhub\modules\fediverse\services\InboundInteractionService;
 use humhub\modules\fediverse\services\LocalObjectResolver;
 use humhub\modules\fediverse\services\RemoteActorResolver;
-use humhub\modules\fediverse\services\RemoteMediaFetcher;
+use humhub\modules\fediverse\services\RemoteObjectResolver;
 use humhub\modules\fediverse\services\SignatureService;
 use humhub\modules\queue\ActiveJob;
 use humhub\modules\user\models\Profile;
@@ -235,7 +235,13 @@ class ProcessInboxActivity extends ActiveJob
         }
     }
 
-    /** Inbound Create{Note, inReplyTo} → comment on the replied-to local content. */
+    /**
+     * Inbound Create{Note}:
+     *  - no inReplyTo → top-level post by a followed actor (ingest as a Post);
+     *  - inReplyTo our content → comment on it;
+     *  - inReplyTo an earlier part of the SAME author's ingested thread → comment
+     *    on the thread root (a multi-part post / self-reply continuation).
+     */
     private function handleCreate(array $activity, string $signerId, array $signerDoc): void
     {
         $object = $activity['object'] ?? null;
@@ -252,21 +258,35 @@ class ProcessInboxActivity extends ActiveJob
             }
             return;
         }
+
+        // A reply to our own content → a comment on it (the replier may be anyone).
         $content = (new LocalObjectResolver())->resolveContent($inReplyTo);
-        if ($content === null) {
-            return; // a reply to something we don't host
-        }
-        $remote = $this->persistActor($signerId, $signerDoc);
-        $author = User::findOne($remote->user_id);
-        if ($author === null) {
+        if ($content !== null) {
+            $remote = $this->persistActor($signerId, $signerDoc);
+            $author = User::findOne($remote->user_id);
+            if ($author !== null) {
+                (new InboundInteractionService())->addRemoteComment($content, $author, $object);
+            }
             return;
         }
-        (new InboundInteractionService())->addComment(
-            $content,
-            $author,
-            (string) ($object['content'] ?? ''),
-            (string) ($object['id'] ?? '')
-        );
+
+        // Otherwise: a continuation of a remote thread we already ingested. Only
+        // the original author's own self-replies (= the parts of a multi-part
+        // post) are threaded in — not third parties replying into the thread.
+        $remote = RemoteActor::findOne(['ap_id' => $signerId]);
+        if ($remote === null) {
+            return; // unknown actor → nothing of theirs to continue
+        }
+        $parent = $this->resolveRemoteRecord($inReplyTo);
+        if ($parent === null || !$this->isAuthoredBy($parent, $remote)) {
+            return; // parent not ours, or a reply by someone other than the thread author
+        }
+        $root = isset($parent->content) ? $parent->content : null;
+        $author = User::findOne($remote->user_id);
+        if ($root === null || $author === null) {
+            return;
+        }
+        (new InboundInteractionService())->addRemoteComment($root, $author, $object);
     }
 
     /** Inbound Delete{Note|Tombstone} → soft-delete the ingested remote post/comment (author only). */
@@ -380,17 +400,7 @@ class ProcessInboxActivity extends ActiveJob
     /** Resolve a remote-origin AP object id to the ingested local record (Post or Comment), or null. */
     private function resolveRemoteRecord(string $apId)
     {
-        if ($apId === '') {
-            return null;
-        }
-        $obj = FederationObject::findOne(['ap_id' => $apId, 'direction' => FederationObject::DIRECTION_REMOTE]);
-        if ($obj === null || $obj->model_class === null || $obj->model_id === null) {
-            return null;
-        }
-        if (!class_exists($obj->model_class) || !method_exists($obj->model_class, 'findOne')) {
-            return null;
-        }
-        return $obj->model_class::findOne($obj->model_id);
+        return (new RemoteObjectResolver())->resolveRecord($apId);
     }
 
     /** True if the verified remote actor is the author of the ingested record. */
@@ -421,9 +431,31 @@ class ProcessInboxActivity extends ActiveJob
         }
     }
 
+    /**
+     * If the signer is a subscribed community, mark our Follow accepted and
+     * report handled. Community Group actors have no RemoteActor/shadow user.
+     */
+    public function acceptCommunityFollow(string $signerId): bool
+    {
+        $coupling = SpaceCommunity::findOne(['community_ap_id' => $signerId]);
+        if ($coupling === null) {
+            return false;
+        }
+        if ($coupling->follow_state !== SpaceCommunity::FOLLOW_STATE_ACCEPTED) {
+            $coupling->follow_state = SpaceCommunity::FOLLOW_STATE_ACCEPTED;
+            $coupling->save(false);
+        }
+        return true;
+    }
+
     /** Remote accepted our outbound Follow → mark our pending follow(s) to it accepted. */
     private function handleAccept(array $activity, string $signerId): void
     {
+        // A community accepting our Space's Follow — no shadow user involved.
+        if ($this->acceptCommunityFollow($signerId)) {
+            return;
+        }
+
         $remote = RemoteActor::findOne(['ap_id' => $signerId]);
         if ($remote === null) {
             return; // we never followed them → no pending follow to accept
@@ -491,7 +523,7 @@ class ProcessInboxActivity extends ActiveJob
         $obj->save();
 
         $this->attachTopics($post, $parsed['tags']);
-        $this->attachRemoteImages($post, $note);
+        (new InboundInteractionService())->attachRemoteImages($post, $note);
     }
 
     /** Attach the parsed trailing hashtags as HumHub topics to the ingested post. */
@@ -519,48 +551,6 @@ class ProcessInboxActivity extends ActiveJob
         }
         if ($models !== []) {
             (new ContentTagService($post->content))->addTags($models);
-        }
-    }
-
-    private const MAX_ATTACHMENTS = 8;
-
-    /** Download a remote Note's image attachments and attach them to the ingested post. */
-    private function attachRemoteImages(Post $post, array $note): void
-    {
-        $attachments = $note['attachment'] ?? null;
-        if (!is_array($attachments)) {
-            return;
-        }
-        $fetcher = new RemoteMediaFetcher();
-        $count = 0;
-        foreach ($attachments as $att) {
-            if ($count >= self::MAX_ATTACHMENTS) {
-                break;
-            }
-            $url = is_array($att) ? ($att['url'] ?? null) : null;
-            if (!is_string($url)) {
-                continue;
-            }
-            $media = $fetcher->fetchImage($url);
-            if ($media === null) {
-                continue; // non-image / unsafe / too big / failed
-            }
-            try {
-                $file = new File();
-                $file->file_name = $fetcher->filenameFor($url, $media['mime']);
-                $file->mime_type = $media['mime'];
-                $file->size = strlen($media['content']);
-                $file->created_by = (int) $post->content->created_by; // shadow user; queue has no logged-in user
-                if (!$file->save()) {
-                    Yii::warning('Fediverse attachment File save failed: ' . implode(', ', $file->getErrorSummary(true)), 'fediverse');
-                    continue;
-                }
-                $file->setStoredFileContent($media['content']);
-                $post->fileManager->attach($file);
-                $count++;
-            } catch (\Throwable $e) {
-                Yii::warning('Fediverse attachment error for ' . $url . ': ' . $e->getMessage(), 'fediverse');
-            }
         }
     }
 

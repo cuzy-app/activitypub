@@ -3,9 +3,11 @@
 namespace humhub\modules\fediverse\controllers;
 
 use humhub\components\Controller;
-use humhub\modules\fediverse\models\RemoteActor;
+use humhub\modules\fediverse\services\CommunityResolver;
+use humhub\modules\fediverse\services\CommunitySubscriptionService;
 use humhub\modules\fediverse\services\DiscoveryPolicy;
 use humhub\modules\fediverse\services\RemoteActorResolver;
+use humhub\modules\fediverse\services\UrlSafety;
 use humhub\modules\user\models\User;
 use Yii;
 use yii\web\BadRequestHttpException;
@@ -33,24 +35,52 @@ class RemoteInteractionController extends Controller
         if ($user === null) {
             return $this->redirect(['/user/auth/login']);
         }
-        $discoverabilityError = DiscoveryPolicy::discoverabilityError($user);
-        if ($discoverabilityError !== null) {
-            return $this->render('authorize', [
-                'uri' => $uri,
-                'remote' => null,
-                'error' => $discoverabilityError,
-            ]);
-        }
 
-        $remote = null;
+        // Resolve to the actor document (no persistence) so we can branch on type.
+        $doc = null;
         $error = null;
         try {
-            $remote = $this->resolveUri($uri);
+            $doc = $this->resolveDoc($uri);
         } catch (\Throwable $e) {
             $error = Yii::t('FediverseModule.base', 'Could not resolve that account: {msg}', ['msg' => $e->getMessage()]);
         }
-        if ($remote === null && $error === null) {
+        if ($doc === null && $error === null) {
             $error = Yii::t('FediverseModule.base', 'That address is not a followable account.');
+        }
+
+        // A Lemmy-family community (Group) → join its mirrored Space. No shadow user,
+        // and the Space's own Group actor sends the Follow, so no discoverability need.
+        if ($doc !== null && ($doc['type'] ?? '') === 'Group') {
+            if (Yii::$app->request->isPost) {
+                try {
+                    $space = (new CommunitySubscriptionService())
+                        ->provisionOrJoin($user, $doc, (string) ($doc['id'] ?? $uri), $this->handleFor($uri, $doc));
+                    $this->view->success(Yii::t('FediverseModule.base', 'Joined the community space “{name}”.', ['name' => $space->name]));
+                    return $this->redirect($space->getUrl());
+                } catch (\Throwable $e) {
+                    $error = Yii::t('FediverseModule.base', 'Could not join that community: {msg}', ['msg' => $e->getMessage()]);
+                }
+            }
+            return $this->render('authorize', [
+                'uri' => $uri,
+                'remote' => null,
+                'community' => ['name' => (string) ($doc['name'] ?? $doc['preferredUsername'] ?? 'Community'), 'handle' => $this->handleFor($uri, $doc)],
+                'error' => $error,
+            ]);
+        }
+
+        // A person (or other actor) → follow it as this user (requires discoverability).
+        $remote = null;
+        if ($doc !== null && $error === null) {
+            $discoverabilityError = DiscoveryPolicy::discoverabilityError($user);
+            if ($discoverabilityError !== null) {
+                return $this->render('authorize', ['uri' => $uri, 'remote' => null, 'community' => null, 'error' => $discoverabilityError]);
+            }
+            try {
+                $remote = (new RemoteActorResolver())->resolveFromDocument((string) ($doc['id'] ?? $uri), $doc);
+            } catch (\Throwable $e) {
+                $error = Yii::t('FediverseModule.base', 'Could not resolve that account: {msg}', ['msg' => $e->getMessage()]);
+            }
         }
 
         if ($remote !== null && Yii::$app->request->isPost) {
@@ -62,24 +92,34 @@ class RemoteInteractionController extends Controller
             }
         }
 
-        return $this->render('authorize', ['uri' => $uri, 'remote' => $remote, 'error' => $error]);
+        return $this->render('authorize', ['uri' => $uri, 'remote' => $remote, 'community' => null, 'error' => $error]);
     }
 
-    /** Resolve a remote-interaction uri (acct handle or profile URL) to a RemoteActor. */
-    private function resolveUri(string $uri): ?RemoteActor
+    /** Resolve a remote-interaction uri (acct/! handle or actor URL) to its actor document, or null. */
+    private function resolveDoc(string $uri): ?array
     {
         $resolver = new RemoteActorResolver();
         if (stripos($uri, 'http') !== 0) {
-            $handle = ltrim(preg_replace('/^acct:/i', '', $uri), '@');
-            if (substr_count($handle, '@') !== 1) {
+            $handle = preg_replace('/^acct:/i', '', trim($uri));
+            $wf = CommunityResolver::webfingerUrl($handle); // strips a leading ! or @, builds acct:name@host
+            if ($wf === '' || !UrlSafety::isSafePublicUrl($wf)) {
                 return null;
             }
-            return $resolver->resolveByHandle($handle);
+            $actorUrl = $resolver->webfingerActorUrl($wf);
+            $doc = $resolver->fetchActorDocument($actorUrl);
+        } else {
+            $doc = $resolver->fetchActorDocument($uri); // SSRF-guarded inside
         }
-        $doc = $resolver->fetchActorDocument($uri);
-        if (empty($doc['inbox'])) {
-            return null; // not an actor (e.g. a status URL) — unsupported here
+        return empty($doc['inbox']) ? null : $doc;
+    }
+
+    /** A display handle (!name@host) for a community, from the input uri or the resolved doc. */
+    private function handleFor(string $uri, array $doc): string
+    {
+        if (stripos($uri, 'http') !== 0) {
+            return '!' . ltrim(preg_replace('/^acct:/i', '', trim($uri)), '!@');
         }
-        return $resolver->resolveFromDocument((string) ($doc['id'] ?? $uri), $doc);
+        $host = (string) parse_url((string) ($doc['id'] ?? ''), PHP_URL_HOST);
+        return '!' . (string) ($doc['preferredUsername'] ?? '') . '@' . $host;
     }
 }

@@ -49,6 +49,12 @@ class FederationUrl
         return self::base() . '/fediverse/actor/' . $guid;
     }
 
+    /** Absolute ActivityPub actor id/URL for a Space's Group actor. */
+    public static function spaceActorUrl(string $guid): string
+    {
+        return self::base() . '/fediverse/actor/space/' . $guid;
+    }
+
     /** Absolute ActivityPub actor id/URL for the instance (Application) actor. */
     public static function instanceActorUrl(): string
     {

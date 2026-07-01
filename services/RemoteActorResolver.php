@@ -375,6 +375,29 @@ class RemoteActorResolver
         return 'https://' . $m[2] . '/.well-known/webfinger?resource=acct:' . $m[1] . '@' . $m[2];
     }
 
+    /**
+     * WebFinger a query URL and return the self-link ActivityPub actor URL.
+     * Follows redirects with SSRF re-validation (via webfingerGet). Throws on failure.
+     */
+    public function webfingerActorUrl(string $webfingerUrl): string
+    {
+        $response = $this->webfingerGet($webfingerUrl);
+        if (!$response->getIsOk()) {
+            throw new RuntimeException('WebFinger lookup failed (' . $response->getStatusCode() . '): ' . $webfingerUrl);
+        }
+        $jrd = json_decode($response->getContent(), true);
+        foreach ($jrd['links'] ?? [] as $link) {
+            if (($link['rel'] ?? '') === 'self'
+                && in_array($link['type'] ?? '', ['application/activity+json', 'application/ld+json'], true)) {
+                $href = (string) ($link['href'] ?? '');
+                if ($href !== '') {
+                    return $href;
+                }
+            }
+        }
+        throw new RuntimeException('No ActivityPub actor link in WebFinger for ' . $webfingerUrl);
+    }
+
     /** Resolve a handle (@user@domain) to a RemoteActor via WebFinger, creating the shadow user. */
     public function resolveByHandle(string $handle): RemoteActor
     {
@@ -383,23 +406,7 @@ class RemoteActorResolver
             throw new RuntimeException('Invalid or unsafe handle: ' . $handle);
         }
 
-        $response = $this->webfingerGet($wf);
-        if (!$response->getIsOk()) {
-            throw new RuntimeException('WebFinger lookup failed (' . $response->getStatusCode() . '): ' . $handle);
-        }
-
-        $jrd = json_decode($response->getContent(), true);
-        $actorUrl = '';
-        foreach ($jrd['links'] ?? [] as $link) {
-            if (($link['rel'] ?? '') === 'self'
-                && in_array($link['type'] ?? '', ['application/activity+json', 'application/ld+json'], true)) {
-                $actorUrl = (string) ($link['href'] ?? '');
-                break;
-            }
-        }
-        if ($actorUrl === '') {
-            throw new RuntimeException('No ActivityPub actor link in WebFinger for ' . $handle);
-        }
+        $actorUrl = $this->webfingerActorUrl($wf);
         return $this->resolve($actorUrl);
     }
 }

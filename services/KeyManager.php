@@ -3,6 +3,7 @@
 namespace humhub\modules\fediverse\services;
 
 use humhub\modules\fediverse\models\LocalActor;
+use humhub\modules\space\models\Space;
 use humhub\modules\user\models\User;
 use RuntimeException;
 use yii\db\IntegrityException;
@@ -37,6 +38,40 @@ class KeyManager
         } catch (IntegrityException $e) {
             // Lost a race with a concurrent provisioning for the same user; reuse the existing row.
             $existing = LocalActor::findOne(['user_id' => $user->id]);
+            if ($existing === null) {
+                throw $e;
+            }
+            return $existing;
+        }
+
+        return $actor;
+    }
+
+    /** Get (or lazily create) the Group LocalActor for a Space. */
+    public function getOrCreateForSpace(Space $space): LocalActor
+    {
+        $actor = LocalActor::findOne(['space_id' => $space->id]);
+        if ($actor !== null) {
+            return $actor;
+        }
+
+        [$privateKey, $publicKey] = $this->generateKeypair();
+
+        $actor = new LocalActor();
+        $actor->space_id = $space->id;
+        $actor->type = LocalActor::TYPE_GROUP;
+        $actor->preferred_username = $this->uniqueHandle($space->url ?: ('space_' . $space->id));
+        $actor->ap_id = FederationUrl::spaceActorUrl($space->guid);
+        $actor->private_key = $privateKey;
+        $actor->public_key = $publicKey;
+
+        try {
+            if (!$actor->save()) {
+                throw new RuntimeException('Could not create Space LocalActor: ' . implode(', ', $actor->getErrorSummary(true)));
+            }
+        } catch (IntegrityException $e) {
+            // Lost a race with a concurrent provisioning for the same space; reuse the existing row.
+            $existing = LocalActor::findOne(['space_id' => $space->id]);
             if ($existing === null) {
                 throw $e;
             }

@@ -21,6 +21,7 @@ use yii\queue\RetryableJobInterface;
 class DeliverToInbox extends ActiveJob implements RetryableJobInterface
 {
     public int $signerUserId = 0;
+    public int $signerActorId = 0; // LocalActor PK; takes precedence over signerUserId (e.g. a Space Group actor)
     public string $inboxUrl = '';
     public string $activityJson = '';
 
@@ -36,7 +37,9 @@ class DeliverToInbox extends ActiveJob implements RetryableJobInterface
 
     public function run()
     {
-        $signer = LocalActor::findOne(['user_id' => $this->signerUserId]);
+        $signer = $this->signerActorId > 0
+            ? LocalActor::findOne(['id' => $this->signerActorId])
+            : LocalActor::findOne(['user_id' => $this->signerUserId]);
         $activity = json_decode($this->activityJson, true);
         if ($signer === null || !is_array($activity) || $this->inboxUrl === '') {
             return; // nothing deliverable — permanent, no retry

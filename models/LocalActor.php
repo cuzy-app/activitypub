@@ -9,6 +9,7 @@ use yii\db\Expression;
 /**
  * @property int $id
  * @property int|null $user_id
+ * @property int|null $space_id
  * @property string $type
  * @property string $preferred_username
  * @property string $ap_id
@@ -24,6 +25,7 @@ class LocalActor extends ActiveRecord
 {
     public const TYPE_PERSON = 'Person';
     public const TYPE_APPLICATION = 'Application';
+    public const TYPE_GROUP = 'Group';
 
     public static function tableName()
     {
@@ -46,7 +48,7 @@ class LocalActor extends ActiveRecord
     {
         return [
             [['type', 'preferred_username', 'ap_id'], 'required'],
-            [['user_id', 'followers_count', 'following_count'], 'integer'],
+            [['user_id', 'space_id', 'followers_count', 'following_count'], 'integer'],
             [['federation_enabled'], 'boolean'],
             [['public_key', 'private_key'], 'string'],
             [['type'], 'string', 'max' => 32],
@@ -54,6 +56,7 @@ class LocalActor extends ActiveRecord
             [['ap_id'], 'unique'],
             [['preferred_username'], 'unique'],
             [['user_id'], 'unique'],
+            [['space_id'], 'unique'],
         ];
     }
 }

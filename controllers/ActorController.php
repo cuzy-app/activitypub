@@ -5,9 +5,11 @@ namespace humhub\modules\fediverse\controllers;
 use humhub\components\Controller;
 use humhub\modules\fediverse\models\FederationFollow;
 use humhub\modules\fediverse\models\LocalActor;
+use humhub\modules\fediverse\models\SpaceCommunity;
 use humhub\modules\fediverse\services\DiscoveryPolicy;
 use humhub\modules\fediverse\services\KeyManager;
 use humhub\modules\fediverse\services\PersonSerializer;
+use humhub\modules\space\models\Space;
 use humhub\modules\user\models\User;
 use Yii;
 use yii\web\NotFoundHttpException;
@@ -36,6 +38,32 @@ class ActorController extends Controller
         $actor = (new KeyManager())->getOrCreateForUser($user);
         $extras = PersonSerializer::profileExtras($user);
         $doc = (new PersonSerializer())->serialize($actor, $user->displayName, $user->getUrl(true), $extras['summary'], $extras['icon'], $extras['image']);
+
+        return $this->asActivityJson($doc);
+    }
+
+    /** GET /fediverse/actor/space/<guid> — the Group actor for a federated Space. */
+    public function actionSpace($guid)
+    {
+        if (!DiscoveryPolicy::isGloballyEnabled()) {
+            throw new NotFoundHttpException();
+        }
+        $space = Space::findOne(['guid' => $guid]);
+        // Only a coupled, guest-visible Space is a valid federated Group actor.
+        if ($space === null
+            || $space->visibility != Space::VISIBILITY_ALL
+            || SpaceCommunity::findOne(['space_id' => $space->id]) === null) {
+            throw new NotFoundHttpException();
+        }
+
+        $actor = (new KeyManager())->getOrCreateForSpace($space);
+
+        $summary = trim((string) $space->description) !== ''
+            ? \humhub\modules\content\widgets\richtext\RichText::convert($space->description, \humhub\modules\content\widgets\richtext\RichText::FORMAT_HTML)
+            : null;
+        $icon = ['type' => 'Image', 'url' => $space->getProfileImage()->getUrl(null, true)];
+
+        $doc = (new PersonSerializer())->serialize($actor, $space->getDisplayName(), $space->getUrl(true), $summary, $icon, null);
 
         return $this->asActivityJson($doc);
     }

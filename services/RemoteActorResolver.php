@@ -49,6 +49,7 @@ class RemoteActorResolver
         $remote->outbox_url = $doc['outbox'] ?? null;
         $remote->public_key = $doc['publicKey']['publicKeyPem'] ?? null;
         $remote->icon_url = is_array($doc['icon'] ?? null) ? ($doc['icon']['url'] ?? null) : null;
+        $remote->banner_url = is_array($doc['image'] ?? null) ? ($doc['image']['url'] ?? null) : null;
         $remote->profile_url = self::extractUrl($doc['url'] ?? null);
         $remote->last_refreshed_at = date('Y-m-d H:i:s');
 
@@ -190,6 +191,9 @@ class RemoteActorResolver
             return; // actor id mismatch
         }
 
+        $previousIconUrl = $remote->icon_url;
+        $previousBannerUrl = $remote->banner_url;
+
         if (isset($doc['preferredUsername'])) {
             $remote->preferred_username = (string) $doc['preferredUsername'];
         }
@@ -198,6 +202,9 @@ class RemoteActorResolver
         }
         if (is_array($doc['icon'] ?? null) && !empty($doc['icon']['url'])) {
             $remote->icon_url = (string) $doc['icon']['url'];
+        }
+        if (is_array($doc['image'] ?? null) && !empty($doc['image']['url'])) {
+            $remote->banner_url = (string) $doc['image']['url'];
         }
         $url = self::extractUrl($doc['url'] ?? null);
         if ($url !== null) {
@@ -212,7 +219,7 @@ class RemoteActorResolver
         if ($user === null) {
             return;
         }
-        $this->applyProfileImages($user, $doc);
+        $this->applyProfileImages($user, $doc, $previousIconUrl, $previousBannerUrl);
         $profile = $user->profile;
         if ($profile !== null) {
             $name = trim((string) ($doc['name'] ?? '')) ?: (string) ($remote->preferred_username ?? '');
@@ -323,12 +330,24 @@ class RemoteActorResolver
         return $user;
     }
 
-    /** Download the actor doc's avatar (icon) + banner (image) and set them on the user. Best-effort. */
-    public function applyProfileImages(User $user, array $doc): void
+    /**
+     * Download the actor doc's avatar (icon) + banner (image) and set them on the user. Best-effort.
+     * An image is skipped when its URL is unchanged since the last sync and it was applied before —
+     * replacing an unchanged image would only cause needless downloads and republishing churn.
+     */
+    public function applyProfileImages(User $user, array $doc, ?string $previousIconUrl = null, ?string $previousBannerUrl = null): void
     {
         $fetcher = new RemoteMediaFetcher();
-        $this->applyOneImage($user->image, is_array($doc['icon'] ?? null) ? ($doc['icon']['url'] ?? null) : null, $fetcher);
-        $this->applyOneImage($user->bannerImage, is_array($doc['image'] ?? null) ? ($doc['image']['url'] ?? null) : null, $fetcher);
+
+        $iconUrl = is_array($doc['icon'] ?? null) ? ($doc['icon']['url'] ?? null) : null;
+        if ($iconUrl !== $previousIconUrl || !$user->image->exists()) {
+            $this->applyOneImage($user->image, $iconUrl, $fetcher);
+        }
+
+        $bannerUrl = is_array($doc['image'] ?? null) ? ($doc['image']['url'] ?? null) : null;
+        if ($bannerUrl !== $previousBannerUrl || !$user->bannerImage->exists()) {
+            $this->applyOneImage($user->bannerImage, $bannerUrl, $fetcher);
+        }
     }
 
     /** @param mixed $assetImage a humhub AssetImage ($user->image / $user->bannerImage) */

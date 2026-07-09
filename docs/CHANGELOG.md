@@ -169,3 +169,8 @@
 - Enh: Codeception unit tests for the pure logic (URL/handle helpers, the
   visibility/discovery policies, HTTP-signature build/sign/verify, the
   Note/actor serializers, the AP-object resolver).
+- Enh: Remote profile images (avatar and banner) are no longer re-downloaded
+  and rewritten on every actor refresh — a new `banner_url` column tracks the
+  banner source like `icon_url`, and images whose URL is unchanged since the
+  last sync are skipped. Avoids needless media fetches and republishing churn
+  of the local copies.

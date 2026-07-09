@@ -360,6 +360,9 @@ class ProcessInboxActivity extends ActiveJob
             return;
         }
 
+        $previousIconUrl = $remote->icon_url;
+        $previousBannerUrl = $remote->banner_url;
+
         if (isset($doc['preferredUsername'])) {
             $remote->preferred_username = (string) $doc['preferredUsername'];
         }
@@ -368,6 +371,9 @@ class ProcessInboxActivity extends ActiveJob
         }
         if (is_array($doc['icon'] ?? null) && !empty($doc['icon']['url'])) {
             $remote->icon_url = (string) $doc['icon']['url'];
+        }
+        if (is_array($doc['image'] ?? null) && !empty($doc['image']['url'])) {
+            $remote->banner_url = (string) $doc['image']['url'];
         }
         $remote->last_refreshed_at = date('Y-m-d H:i:s');
         $remote->save();
@@ -394,7 +400,7 @@ class ProcessInboxActivity extends ActiveJob
             }
         }
 
-        (new RemoteActorResolver())->applyProfileImages($user, $doc);
+        (new RemoteActorResolver())->applyProfileImages($user, $doc, $previousIconUrl, $previousBannerUrl);
     }
 
     /** Resolve a remote-origin AP object id to the ingested local record (Post or Comment), or null. */

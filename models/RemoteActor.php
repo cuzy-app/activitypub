@@ -19,6 +19,7 @@ use yii\db\Expression;
  * @property string|null $outbox_url
  * @property string|null $public_key
  * @property string|null $icon_url
+ * @property string|null $banner_url
  * @property string|null $profile_url
  * @property int|null $followers_count
  * @property int|null $following_count
@@ -52,7 +53,7 @@ class RemoteActor extends ActiveRecord
             [['user_id'], 'integer'],
             [['public_key'], 'string'],
             [['type'], 'string', 'max' => 32],
-            [['ap_id', 'preferred_username', 'handle', 'domain', 'inbox_url', 'shared_inbox_url', 'outbox_url', 'icon_url'], 'string', 'max' => 255],
+            [['ap_id', 'preferred_username', 'handle', 'domain', 'inbox_url', 'shared_inbox_url', 'outbox_url', 'icon_url', 'banner_url'], 'string', 'max' => 255],
             [['ap_id'], 'unique'],
             [['user_id'], 'unique'],
         ];

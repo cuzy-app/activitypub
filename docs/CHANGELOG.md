@@ -174,3 +174,14 @@
   banner source like `icon_url`, and images whose URL is unchanged since the
   last sync are skipped. Avoids needless media fetches and republishing churn
   of the local copies.
+- Fix: Inbound HTTP-signature verification no longer depends on what a reverse
+  proxy in front of PHP passes as `Host` and request path. Besides the received
+  values, the canonical host/path derived from the configured base URL are tried
+  (remotes sign the public values they addressed), `Host`/`Content-Type`/
+  `Content-Length` are filled from the server vars when the SAPI omits them, and
+  a failed verification now logs the received vs. canonical host/path and any
+  missing signed headers. Fixes all inbound activities being rejected behind a
+  WAF/reverse proxy (e.g. BunkerWeb) that rewrites the upstream `Host`.
+- Enh: Module unit tests can be run standalone against a HumHub checkout
+  (`HUMHUB_PATH=/path/to/humhub codecept run unit -c tests`): the test bootstrap
+  now loads the core test harness and the required `tests/config/*.php` exist.

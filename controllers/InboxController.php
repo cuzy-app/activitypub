@@ -5,6 +5,7 @@ namespace humhub\modules\fediverse\controllers;
 use humhub\components\Controller;
 use humhub\modules\fediverse\jobs\ProcessInboxActivity;
 use humhub\modules\fediverse\services\DiscoveryPolicy;
+use humhub\modules\fediverse\services\FederationUrl;
 use Yii;
 use yii\web\BadRequestHttpException;
 use yii\web\Response;
@@ -67,17 +68,22 @@ class InboxController extends Controller
         foreach (Yii::$app->request->headers->toArray() as $name => $values) {
             $headers[strtolower($name)] = is_array($values) ? (string) end($values) : (string) $values;
         }
-        // Yii's header collection does not expose the Host header under some SAPIs
-        // (e.g. FrankenPHP), but remotes sign `host`. Take it from the server var,
-        // which holds exactly the value the remote sent (and signed).
-        if (empty($headers['host']) && !empty($_SERVER['HTTP_HOST'])) {
-            $headers['host'] = (string) $_SERVER['HTTP_HOST'];
+        // Yii's header collection does not expose some headers under some SAPIs
+        // (e.g. Host under FrankenPHP; Content-Type/Length arrive as CONTENT_* server
+        // vars), but remotes sign them. Fill them from the server vars, which hold
+        // exactly the values the request carried.
+        foreach (['host' => 'HTTP_HOST', 'content-type' => 'CONTENT_TYPE', 'content-length' => 'CONTENT_LENGTH'] as $name => $var) {
+            if (empty($headers[$name]) && !empty($_SERVER[$var])) {
+                $headers[$name] = (string) $_SERVER[$var];
+            }
         }
 
         Yii::$app->queue->push(new ProcessInboxActivity([
             'rawBody' => $rawBody,
             'headers' => $headers,
             'requestPath' => Yii::$app->request->getUrl(),
+            // The path the remote signed, from our base URL (a proxy may rewrite the received one).
+            'canonicalPath' => FederationUrl::canonicalRequestPath(Yii::$app->request->getPathInfo(), Yii::$app->request->getQueryString()),
             'targetGuid' => $targetGuid,
         ]));
 

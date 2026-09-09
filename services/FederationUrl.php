@@ -43,6 +43,19 @@ class FederationUrl
         return rtrim($base, '/');
     }
 
+    /**
+     * The request path a remote signed as `(request-target)` for a request to
+     * this installation: our base URL's path prefix (if any) plus Yii's path info,
+     * plus the query string. Built from configuration, not from the request, so a
+     * reverse proxy that rewrites the path in front of PHP does not affect it.
+     */
+    public static function canonicalRequestPath(string $pathInfo, string $queryString = '', ?string $baseUrl = null): string
+    {
+        $prefix = rtrim((string) parse_url($baseUrl ?? self::base(), PHP_URL_PATH), '/');
+        $path = $prefix . '/' . ltrim($pathInfo, '/');
+        return $queryString === '' ? $path : $path . '?' . $queryString;
+    }
+
     /** Absolute ActivityPub actor id/URL for a user GUID. */
     public static function actorUrl(string $guid): string
     {

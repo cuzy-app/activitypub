@@ -4,6 +4,7 @@ namespace tests\codeception\unit\modules\fediverse;
 
 use humhub\modules\fediverse\services\FederationUrl;
 use tests\codeception\_support\HumHubDbTestCase;
+use Yii;
 
 class FederationUrlTest extends HumHubDbTestCase
 {
@@ -33,5 +34,20 @@ class FederationUrlTest extends HumHubDbTestCase
         $domain = FederationUrl::domain();
         $this->assertStringNotContainsString('://', $domain);
         $this->assertStringNotContainsString('/', $domain);
+    }
+
+    public function testCanonicalRequestPathIsBuiltFromBaseUrlNotFromTheProxy()
+    {
+        // Defaults to the configured base URL (fixed to a host-only URL in the test config).
+        $this->assertSame('/fediverse/inbox', FederationUrl::canonicalRequestPath('fediverse/inbox'));
+
+        $base = 'https://fedihub.social';
+        $this->assertSame('/fediverse/inbox', FederationUrl::canonicalRequestPath('fediverse/inbox', '', $base));
+        $this->assertSame('/fediverse/inbox', FederationUrl::canonicalRequestPath('/fediverse/inbox', '', $base));
+        $this->assertSame('/fediverse/actor/abc/inbox?page=1', FederationUrl::canonicalRequestPath('fediverse/actor/abc/inbox', 'page=1', $base));
+
+        // Installed under a sub-path: the remote signed the prefixed path even if a
+        // proxy in front of PHP strips the prefix.
+        $this->assertSame('/humhub/fediverse/inbox', FederationUrl::canonicalRequestPath('fediverse/inbox', '', 'https://example.org/humhub/'));
     }
 }

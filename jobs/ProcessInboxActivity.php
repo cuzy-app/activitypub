@@ -13,6 +13,7 @@ use humhub\modules\post\models\Post;
 use humhub\modules\topic\models\Topic;
 use humhub\modules\fediverse\services\ActivityLog;
 use humhub\modules\fediverse\services\FederatedHtml;
+use humhub\modules\fediverse\services\FederationUrl;
 use humhub\modules\fediverse\services\InboundInteractionService;
 use humhub\modules\fediverse\services\LocalObjectResolver;
 use humhub\modules\fediverse\services\RemoteActorResolver;
@@ -34,6 +35,8 @@ class ProcessInboxActivity extends ActiveJob
     public string $rawBody = '';
     public array $headers = [];
     public string $requestPath = '';
+    /** The request path as the remote signed it, rebuilt from our base URL (see InboxController). */
+    public string $canonicalPath = '';
     public ?string $targetGuid = null;
 
     public function run()
@@ -135,11 +138,34 @@ class ProcessInboxActivity extends ActiveJob
         }
 
         $svc = new SignatureService();
-        // Reconstruct from ALL received headers so any signed header resolves.
-        $signingString = $svc->buildSigningString('POST', $this->requestPath, $this->headers, $headerList);
-        if (!$svc->verifyString($signingString, $parsed['signature'], $pem)) {
+        // Reconstruct from ALL received headers so any signed header resolves. A
+        // reverse proxy in front of PHP may have rewritten `host` or the path, but the
+        // remote signed the public values it addressed — so besides the received
+        // values also try the canonical ones derived from our own base URL.
+        $receivedHost = (string) ($this->headers['host'] ?? '');
+        $canonicalHost = $this->canonicalHost();
+        $candidates = $svc->signingStringCandidates(
+            'POST',
+            [$this->requestPath, $this->canonicalPath],
+            [$receivedHost, $canonicalHost],
+            $this->headers,
+            $headerList
+        );
+        $verified = false;
+        foreach ($candidates as $signingString) {
+            if ($svc->verifyString($signingString, $parsed['signature'], $pem)) {
+                $verified = true;
+                break;
+            }
+        }
+        if (!$verified) {
+            $missing = SignatureService::missingSignedHeaders($this->headers, $headerList);
             Yii::warning('Fediverse inbox: signature verify failed (actor ' . $actorUrl
-                . ', signed headers [' . $parsed['headers'] . '])', 'fediverse');
+                . ', signed headers [' . $parsed['headers'] . ']'
+                . ', received host "' . $receivedHost . '" path "' . $this->requestPath . '"'
+                . ', canonical host "' . $canonicalHost . '" path "' . $this->canonicalPath . '"'
+                . ($missing !== [] ? ', missing signed headers [' . implode(' ', $missing) . ']' : '')
+                . ')', 'fediverse');
             return null;
         }
 
@@ -157,6 +183,16 @@ class ProcessInboxActivity extends ActiveJob
     private function persistActor(string $signerId, array $signerDoc): RemoteActor
     {
         return (new RemoteActorResolver())->resolveFromDocument($signerId, $signerDoc);
+    }
+
+    /** Our public host as remotes sign it; '' when no base URL is available (e.g. unconfigured console). */
+    private function canonicalHost(): string
+    {
+        try {
+            return FederationUrl::domain();
+        } catch (\Throwable $e) {
+            return '';
+        }
     }
 
     private function isFreshDate(string $date): bool

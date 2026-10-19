@@ -1,7 +1,7 @@
 <?php
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\services\RemoteActorResolver;
+use humhub\modules\activitypub\services\RemoteActorResolver;
 use tests\codeception\_support\HumHubDbTestCase;
 
 class WebfingerHandleTest extends HumHubDbTestCase

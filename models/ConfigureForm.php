@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\models;
+namespace humhub\modules\activitypub\models;
 
 use humhub\modules\user\helpers\AuthHelper;
 use humhub\modules\user\models\Group;
@@ -31,9 +31,9 @@ class ConfigureForm extends Model
     public function attributeLabels()
     {
         return [
-            'enabled' => Yii::t('FediverseModule.base', 'Enable federation for this site'),
-            'activityLogEnabled' => Yii::t('FediverseModule.base', 'Log federation activity (debug)'),
-            'remoteUserGroupId' => Yii::t('FediverseModule.base', 'Group for federated (remote) users'),
+            'enabled' => Yii::t('ActivitypubModule.base', 'Enable federation for this site'),
+            'activityLogEnabled' => Yii::t('ActivitypubModule.base', 'Log federation activity (debug)'),
+            'remoteUserGroupId' => Yii::t('ActivitypubModule.base', 'Group for federated (remote) users'),
         ];
     }
 
@@ -77,6 +77,6 @@ class ConfigureForm extends Model
 
     private function getModule(): \humhub\components\Module
     {
-        return Yii::$app->getModule('fediverse');
+        return Yii::$app->getModule('activitypub');
     }
 }

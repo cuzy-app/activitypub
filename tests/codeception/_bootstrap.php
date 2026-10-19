@@ -5,7 +5,7 @@
  *
  * The core is taken from the HUMHUB_PATH environment variable, else from
  * `humhub_root` in tests/config/test.php, else the module is assumed to live in
- * <humhub>/protected/modules/fediverse.
+ * <humhub>/protected/modules/activitypub.
  */
 
 $testRoot = dirname(__DIR__);

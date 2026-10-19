@@ -1,14 +1,14 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
 use humhub\modules\content\interfaces\ContentProvider;
 use humhub\modules\content\models\Content;
-use humhub\modules\fediverse\models\FederationObject;
+use humhub\modules\activitypub\models\FederationObject;
 
 /**
  * Resolves an ActivityPub object id we previously published (a local Note)
- * back to its HumHub Content, via the fediverse_object mapping.
+ * back to its HumHub Content, via the activitypub_object mapping.
  */
 class LocalObjectResolver
 {

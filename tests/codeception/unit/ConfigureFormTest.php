@@ -1,8 +1,8 @@
 <?php
 
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\models\ConfigureForm;
+use humhub\modules\activitypub\models\ConfigureForm;
 use tests\codeception\_support\HumHubDbTestCase;
 use Yii;
 
@@ -20,7 +20,7 @@ class ConfigureFormTest extends HumHubDbTestCase
         $this->assertTrue((bool) $reloaded->enabled);
 
         // Defaults to false when unset.
-        Yii::$app->getModule('fediverse')->settings->delete('enabled');
+        Yii::$app->getModule('activitypub')->settings->delete('enabled');
         $fresh = new ConfigureForm();
         $fresh->loadSettings();
         $this->assertFalse((bool) $fresh->enabled);

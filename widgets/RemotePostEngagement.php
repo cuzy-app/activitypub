@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\widgets;
+namespace humhub\modules\activitypub\widgets;
 
 use humhub\components\Widget;
 use Yii;
@@ -15,7 +15,7 @@ class RemotePostEngagement extends Widget
         if (!$this->apId) {
             return '';
         }
-        $stats = Yii::$app->cache->get('fediverse.poststats.' . md5($this->apId));
+        $stats = Yii::$app->cache->get('activitypub.poststats.' . md5($this->apId));
         $url = (is_array($stats) && !empty($stats['url'])) ? $stats['url'] : $this->apId;
         return $this->render('remotePostEngagement', [
             'url' => $url,

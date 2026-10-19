@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse;
+namespace humhub\modules\activitypub;
 
 use humhub\helpers\ControllerHelper;
 use humhub\models\RecordMap;
@@ -9,22 +9,22 @@ use humhub\modules\content\events\ContentStateEvent;
 use humhub\modules\content\interfaces\ContentOwner;
 use humhub\modules\content\models\Content;
 use humhub\modules\content\widgets\richtext\RichText;
-use humhub\modules\fediverse\jobs\DeliverActivity;
-use humhub\modules\fediverse\jobs\DeliverToInbox;
-use humhub\modules\fediverse\jobs\RefreshRemoteActor;
-use humhub\modules\fediverse\jobs\RefreshRemotePost;
-use humhub\modules\fediverse\models\FederationFollow;
-use humhub\modules\fediverse\models\FederationObject;
-use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\models\RemoteActor;
-use humhub\modules\fediverse\services\DiscoveryPolicy;
-use humhub\modules\fediverse\services\FederatedUserSource;
-use humhub\modules\fediverse\services\FederationContentPolicy;
-use humhub\modules\fediverse\services\FederationUrl;
-use humhub\modules\fediverse\services\KeyManager;
-use humhub\modules\fediverse\services\NoteSerializer;
-use humhub\modules\fediverse\services\PersonSerializer;
-use humhub\modules\fediverse\services\RemoteTargetResolver;
+use humhub\modules\activitypub\jobs\DeliverActivity;
+use humhub\modules\activitypub\jobs\DeliverToInbox;
+use humhub\modules\activitypub\jobs\RefreshRemoteActor;
+use humhub\modules\activitypub\jobs\RefreshRemotePost;
+use humhub\modules\activitypub\models\FederationFollow;
+use humhub\modules\activitypub\models\FederationObject;
+use humhub\modules\activitypub\models\LocalActor;
+use humhub\modules\activitypub\models\RemoteActor;
+use humhub\modules\activitypub\services\DiscoveryPolicy;
+use humhub\modules\activitypub\services\FederatedUserSource;
+use humhub\modules\activitypub\services\FederationContentPolicy;
+use humhub\modules\activitypub\services\FederationUrl;
+use humhub\modules\activitypub\services\KeyManager;
+use humhub\modules\activitypub\services\NoteSerializer;
+use humhub\modules\activitypub\services\PersonSerializer;
+use humhub\modules\activitypub\services\RemoteTargetResolver;
 use humhub\modules\like\models\Like;
 use humhub\modules\post\models\Post;
 use humhub\modules\ui\menu\MenuLink;
@@ -173,7 +173,7 @@ class Events
             return; // target is a normal local user, not a federated account
         }
         if (!DiscoveryPolicy::isDiscoverable($follower)) {
-            Yii::warning('Fediverse: follower ' . $follower->id . ' is not federatable; remote follow not sent', 'fediverse');
+            Yii::warning('ActivityPub: follower ' . $follower->id . ' is not federatable; remote follow not sent', 'activitypub');
             return;
         }
 
@@ -370,12 +370,12 @@ class Events
             return;
         }
         $event->sender->addEntry(new MenuLink([
-            'label' => Yii::t('FediverseModule.base', 'Fediverse'),
-            'id' => 'account-fediverse',
+            'label' => Yii::t('ActivitypubModule.base', 'Fediverse'),
+            'id' => 'account-activitypub',
             'icon' => 'globe',
-            'url' => ['/fediverse/settings'],
+            'url' => ['/activitypub/settings'],
             'sortOrder' => 125,
-            'isActive' => ControllerHelper::isActivePath('fediverse', 'settings'),
+            'isActive' => ControllerHelper::isActivePath('activitypub', 'settings'),
         ]));
     }
 
@@ -393,8 +393,8 @@ class Events
         self::lazyRefreshRemoteActor($remote);
 
         $event->sender->addEntry(new MenuLink([
-            'label' => Yii::t('FediverseModule.base', 'Fediverse profile'),
-            'id' => 'profile-fediverse',
+            'label' => Yii::t('ActivitypubModule.base', 'Fediverse profile'),
+            'id' => 'profile-activitypub',
             'icon' => 'globe',
             'url' => $remote->profile_url ?: $remote->ap_id,
             'htmlOptions' => ['target' => '_blank', 'rel' => 'noopener'],
@@ -419,14 +419,14 @@ class Events
         $counters = [];
         if ($remote->followers_count !== null) {
             $counters[] = new CounterSetItem([
-                'label' => Yii::t('FediverseModule.base', 'Followers'),
+                'label' => Yii::t('ActivitypubModule.base', 'Followers'),
                 'value' => (int) $remote->followers_count,
                 'url' => null,
             ]);
         }
         if ($remote->following_count !== null) {
             $counters[] = new CounterSetItem([
-                'label' => Yii::t('FediverseModule.base', 'Following'),
+                'label' => Yii::t('ActivitypubModule.base', 'Following'),
                 'value' => (int) $remote->following_count,
                 'url' => null,
             ]);
@@ -451,7 +451,7 @@ class Events
         }
         // De-dupe concurrent enqueues for the same actor within a short window.
         $cache = Yii::$app->cache;
-        $key = 'fediverse.refresh.' . $remote->id;
+        $key = 'activitypub.refresh.' . $remote->id;
         if ($cache->get($key)) {
             return;
         }
@@ -470,7 +470,7 @@ class Events
         $sidebar->removeWidget('humhub\modules\user\widgets\UserSpaces');
         $sidebar->removeWidget('humhub\modules\user\widgets\UserFollower');
         $sidebar->removeWidget('humhub\modules\friendship\widgets\FriendsPanel');
-        $sidebar->addWidget('humhub\modules\fediverse\widgets\RemoteAccountInfo', ['user' => $user], ['sortOrder' => 5]);
+        $sidebar->addWidget('humhub\modules\activitypub\widgets\RemoteAccountInfo', ['user' => $user], ['sortOrder' => 5]);
     }
 
     /** Hide the "Add Friend" button on remote profiles (a request to a login-disabled shadow user is pointless). */
@@ -490,7 +490,7 @@ class Events
             return;
         }
         self::lazyRefreshRemotePost($apId);
-        $event->sender->addWidget('humhub\modules\fediverse\widgets\RemotePostEngagement', ['apId' => $apId], ['sortOrder' => 100]);
+        $event->sender->addWidget('humhub\modules\activitypub\widgets\RemotePostEngagement', ['apId' => $apId], ['sortOrder' => 100]);
     }
 
     /** If the wall object is an ingested remote post, return its Note AP id; else null. */
@@ -516,10 +516,10 @@ class Events
     private static function lazyRefreshRemotePost(string $apId): void
     {
         $cache = Yii::$app->cache;
-        if ($cache->get('fediverse.poststats.' . md5($apId)) !== false) {
+        if ($cache->get('activitypub.poststats.' . md5($apId)) !== false) {
             return; // fresh within TTL
         }
-        $lock = 'fediverse.poststats.lock.' . md5($apId);
+        $lock = 'activitypub.poststats.lock.' . md5($apId);
         if ($cache->get($lock)) {
             return;
         }
@@ -675,7 +675,7 @@ class Events
         Yii::$app->view->registerCss(
             'img[alt^=":"][alt$=":"]{height:1.4em;width:auto;vertical-align:middle;margin:0 1px;}',
             [],
-            'fediverse-custom-emoji'
+            'activitypub-custom-emoji'
         );
     }
 
@@ -686,11 +686,11 @@ class Events
             return '';
         }
         if ($user->user_source === FederatedUserSource::ID && $user->profile !== null) {
-            $dn = trim((string) $user->profile->fediverse_displayname);
+            $dn = trim((string) $user->profile->activitypub_displayname);
             if ($dn !== '') {
                 return $dn;
             }
-            $handle = trim((string) $user->profile->fediverse_handle);
+            $handle = trim((string) $user->profile->activitypub_handle);
             return $handle !== '' ? $handle : $user->username;
         }
         // Non-federated users: defer to a callback configured elsewhere (e.g. config.php)
@@ -713,7 +713,7 @@ class Events
             return '';
         }
         if ($user->user_source === FederatedUserSource::ID) {
-            return trim((string) $user->profile->fediverse_handle);
+            return trim((string) $user->profile->activitypub_handle);
         }
         // Non-federated users: defer to a sub-callback configured elsewhere if present.
         if (self::$previousDisplayNameSubCallback !== null) {
@@ -724,7 +724,7 @@ class Events
 
     /**
      * Stamp the canonical Fediverse handle (@username@domain) into a LOCAL user's
-     * fediverse_handle profile field, so it can be shown as the display-name subtitle
+     * activitypub_handle profile field, so it can be shown as the display-name subtitle
      * (Administration → Settings → Appearance → "User Display Name Subtitle" →
      * "Fediverse Handle"). Federated shadow users are skipped — their handle comes from
      * the remote actor. Written via updateAttributes so it does not re-fire profile
@@ -740,8 +740,8 @@ class Events
             return;
         }
         $handle = mb_substr('@' . FederationUrl::normalizeHandle($user->username) . '@' . FederationUrl::domain(), 0, 255);
-        if ((string) $profile->fediverse_handle !== $handle) {
-            $profile->updateAttributes(['fediverse_handle' => $handle]);
+        if ((string) $profile->activitypub_handle !== $handle) {
+            $profile->updateAttributes(['activitypub_handle' => $handle]);
         }
     }
 

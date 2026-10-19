@@ -1,8 +1,8 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
-use humhub\modules\fediverse\models\LocalActor;
+use humhub\modules\activitypub\models\LocalActor;
 use humhub\modules\space\models\Space;
 use humhub\modules\user\models\User;
 use RuntimeException;

@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
 use humhub\models\RecordMap;
 use humhub\modules\comment\models\Comment;
@@ -8,7 +8,7 @@ use humhub\modules\content\components\ContentActiveRecord;
 use humhub\modules\content\components\ContentAddonActiveRecord;
 use humhub\modules\content\interfaces\ContentProvider;
 use humhub\modules\content\models\Content;
-use humhub\modules\fediverse\models\FederationObject;
+use humhub\modules\activitypub\models\FederationObject;
 use humhub\modules\file\models\File;
 use humhub\modules\like\models\Like;
 use humhub\modules\user\models\User;
@@ -33,7 +33,7 @@ class InboundInteractionService
     {
         $noteApId = (string) ($note['id'] ?? '');
         if ($noteApId === '') {
-            Yii::warning('Fediverse inbound comment dropped: Note has no id', 'fediverse');
+            Yii::warning('ActivityPub inbound comment dropped: Note has no id', 'activitypub');
             return; // an id-less Note cannot be de-duplicated; reject rather than risk duplicates
         }
         if (FederationObject::find()->where(['ap_id' => $noteApId])->exists()) {
@@ -46,11 +46,11 @@ class InboundInteractionService
         $comment->created_by = $author->id;
         try {
             if (!$comment->save()) {
-                Yii::warning('Fediverse inbound comment save failed: ' . implode(', ', $comment->getErrorSummary(true)), 'fediverse');
+                Yii::warning('ActivityPub inbound comment save failed: ' . implode(', ', $comment->getErrorSummary(true)), 'activitypub');
                 return;
             }
         } catch (\Throwable $e) {
-            Yii::warning('Fediverse inbound comment not saved: ' . $e->getMessage(), 'fediverse');
+            Yii::warning('ActivityPub inbound comment not saved: ' . $e->getMessage(), 'activitypub');
             return;
         }
         $this->record($noteApId, 'Note', Comment::class, $comment->id);
@@ -79,11 +79,11 @@ class InboundInteractionService
         $like->created_by = $author->id; // explicit: the queue has no logged-in user
         try {
             if (!$like->save()) {
-                Yii::warning('Fediverse inbound like save failed: ' . implode(', ', $like->getErrorSummary(true)), 'fediverse');
+                Yii::warning('ActivityPub inbound like save failed: ' . implode(', ', $like->getErrorSummary(true)), 'activitypub');
                 return;
             }
         } catch (\Throwable $e) {
-            Yii::warning('Fediverse inbound like not saved: ' . $e->getMessage(), 'fediverse');
+            Yii::warning('ActivityPub inbound like not saved: ' . $e->getMessage(), 'activitypub');
             return;
         }
         if ($likeApId !== '') {
@@ -136,14 +136,14 @@ class InboundInteractionService
                 $file->size = strlen($media['content']);
                 $file->created_by = (int) $record->content->created_by; // shadow user; queue has no logged-in user
                 if (!$file->save()) {
-                    Yii::warning('Fediverse attachment File save failed: ' . implode(', ', $file->getErrorSummary(true)), 'fediverse');
+                    Yii::warning('ActivityPub attachment File save failed: ' . implode(', ', $file->getErrorSummary(true)), 'activitypub');
                     continue;
                 }
                 $file->setStoredFileContent($media['content']);
                 $record->fileManager->attach($file);
                 $count++;
             } catch (\Throwable $e) {
-                Yii::warning('Fediverse attachment error for ' . $url . ': ' . $e->getMessage(), 'fediverse');
+                Yii::warning('ActivityPub attachment error for ' . $url . ': ' . $e->getMessage(), 'activitypub');
             }
         }
     }
@@ -166,7 +166,7 @@ class InboundInteractionService
         $obj->model_class = $modelClass;
         $obj->model_id = $modelId;
         if (!$obj->save()) {
-            Yii::warning('Fediverse object mapping failed for ' . $apId . ': ' . implode(', ', $obj->getErrorSummary(true)), 'fediverse');
+            Yii::warning('ActivityPub object mapping failed for ' . $apId . ': ' . implode(', ', $obj->getErrorSummary(true)), 'activitypub');
         }
     }
 }

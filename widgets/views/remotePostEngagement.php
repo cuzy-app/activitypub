@@ -8,11 +8,11 @@ use yii\helpers\Html;
 
 $parts = [];
 if ($likes !== null) {
-    $parts[] = Html::encode(Yii::t('FediverseModule.base', 'Federated Likes ({n})', ['n' => Yii::$app->formatter->asInteger($likes)]));
+    $parts[] = Html::encode(Yii::t('ActivitypubModule.base', 'Federated Likes ({n})', ['n' => Yii::$app->formatter->asInteger($likes)]));
 }
 if ($shares !== null) {
-    $parts[] = Html::encode(Yii::t('FediverseModule.base', 'Federated Boosts ({n})', ['n' => Yii::$app->formatter->asInteger($shares)]));
+    $parts[] = Html::encode(Yii::t('ActivitypubModule.base', 'Federated Boosts ({n})', ['n' => Yii::$app->formatter->asInteger($shares)]));
 }
-$parts[] = Html::a(Yii::t('FediverseModule.base', 'Open original') . ' ↗', $url, ['target' => '_blank', 'rel' => 'noopener']);
+$parts[] = Html::a(Yii::t('ActivitypubModule.base', 'Open original') . ' ↗', $url, ['target' => '_blank', 'rel' => 'noopener']);
 ?>
 <span class="text-muted" style="font-size:11px;"><?= implode(' &middot; ', $parts); ?></span>

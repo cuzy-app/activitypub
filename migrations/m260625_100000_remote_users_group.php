@@ -32,7 +32,7 @@ class m260625_100000_remote_users_group extends Migration
         }
 
         // Backfill existing federated shadow users (those with a remote actor).
-        $userIds = (new Query())->select('user_id')->from('fediverse_remote_actor')->column();
+        $userIds = (new Query())->select('user_id')->from('activitypub_remote_actor')->column();
         foreach ($userIds as $uid) {
             $exists = (new Query())->from('group_user')
                 ->where(['user_id' => $uid, 'group_id' => $groupId])->exists();

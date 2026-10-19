@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\models;
+namespace humhub\modules\activitypub\models;
 
 use yii\db\ActiveRecord;
 
@@ -20,6 +20,6 @@ class ActivityLogEntry extends ActiveRecord
 {
     public static function tableName()
     {
-        return 'fediverse_activity_log';
+        return 'activitypub_activity_log';
     }
 }

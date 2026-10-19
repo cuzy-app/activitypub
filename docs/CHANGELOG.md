@@ -2,13 +2,13 @@
 
 ## 0.1.0 (Unreleased)
 
-- Enh: Module foundation — module shell, the five `fediverse_*` tables
+- Enh: Module foundation — module shell, the five `activitypub_*` tables
   (local/remote actors, AP-object↔record map, follow handshake, delivery log),
   ActiveRecord models, and a global federation on/off admin setting.
 - Enh: Identity & discovery — every guest-visible profile is a followable
   `Person` actor (GUID-based URL) plus an instance `Application` actor; WebFinger,
   Actor and NodeInfo endpoints; lazily-generated RSA keypairs.
-- Enh: Inbound core — signed inbox (`/fediverse/inbox` + per-actor), HTTP
+- Enh: Inbound core — signed inbox (`/activitypub/inbox` + per-actor), HTTP
   Signature verification (digest required, key fetched from `keyId`, actor
   binding, freshness window, SSRF-guarded fetches), remote actors resolved into
   login-disabled "federated" shadow users, and `Follow` → auto-`Accept`.
@@ -46,14 +46,14 @@
   file attachments, and an inbound `Update{Person}` refreshes a remote user's
   name, bio, avatar and banner. Downloads are SSRF-guarded, HTTPS-only, restricted
   to raster image types, and size-capped.
-- Enh: Federated users are first-class — a dedicated `fediverse` `UserSource`
+- Enh: Federated users are first-class — a dedicated `activitypub` `UserSource`
   governs them (synced profile read-only, no self-delete, no email required),
   their username is their `@user@domain` handle, and they no longer carry a
-  synthetic email. The `fediverse/migrate-shadow-users` console command brings
+  synthetic email. The `activitypub/migrate-shadow-users` console command brings
   existing federated users onto this model and backfills avatar/banner/bio.
   (Requires the core per-source optional-email change, HumHub PR #8239.)
 - Enh: Federated identity lives in dedicated, protected profile fields — a new
-  "Fediverse" category with `fediverse_displayname` and `fediverse_handle` —
+  "Fediverse" category with `activitypub_displayname` and `activitypub_handle` —
   instead of being squeezed into first/last name; the display name and its
   `@user@domain` sub-line are rendered via `displayNameCallback`, so a remote
   user shows as their real name (not `name domain`) and local users are
@@ -102,7 +102,7 @@
   content, or a post from an account we follow. Boosts, likes/replies that don't
   attach, posts from strangers, and Undo/Delete/Update/Accept from unknown actors
   are processed without minting an empty user. A new
-  `fediverse/prune-remote-actors` console command removes the orphan shadow users
+  `activitypub/prune-remote-actors` console command removes the orphan shadow users
   accumulated before this fix (no follow and no like/comment/post).
 - Enh: A remote user's profile drops the meaningless local-graph sidebar panels
   (Spaces, Followers, Friends) in favour of a "Remote account" panel linking to
@@ -134,7 +134,7 @@
 - Enh: Federated users are collected in a group (new shadow users join
   automatically, existing ones are backfilled), so the People directory can later
   be filtered by local vs. remote. A default "Remote Users" group is created, and
-  the target group is selectable in the Fediverse admin settings.
+  the target group is selectable in the ActivityPub admin settings.
 - Fix: A federated shadow user is no longer added to the site's default (local)
   user group. The core assigns the default group in `User::afterSave()` when a
   user has no group yet, so creation now suppresses it (`allowAssignDefaultGroup(false)`)
@@ -146,13 +146,13 @@
 - Enh: An opt-in "federation activity log" (admin setting, off by default) records
   recent inbound/outbound activities (raw JSON + outcome) to a capped table, with
   an admin viewer — useful for debugging e.g. mis-parsed remote content.
-- Enh: The Fediverse admin page shows basic statistics — local/remote actors,
+- Enh: The ActivityPub admin page shows basic statistics — local/remote actors,
   inbound/outbound follow counts, and federated vs. ingested post counts.
 - Enh: The Fediverse settings page notes that liking or commenting on federated
   content is itself federated (delivered to the remote author and publicly
   visible there).
 - Enh: Local users now also carry their canonical Fediverse handle
-  (`@user@domain`) in the `fediverse_handle` profile field, kept in sync on
+  (`@user@domain`) in the `activitypub_handle` profile field, kept in sync on
   creation and username change, so it can be shown as the display-name subtitle
   (Administration → Settings → Appearance → "User Display Name Subtitle" →
   "Fediverse Handle").

@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
 use humhub\modules\user\models\User;
 use humhub\modules\user\source\BaseUserSource;
@@ -15,7 +15,7 @@ use humhub\modules\user\source\UserSourceInterface;
  */
 class FederatedUserSource extends BaseUserSource
 {
-    public const ID = 'fediverse';
+    public const ID = 'activitypub';
 
     /** Name of the user group federated shadow users are assigned to (for People filtering). */
     public const REMOTE_GROUP_NAME = 'Remote Users';

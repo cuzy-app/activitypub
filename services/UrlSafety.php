@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
 /**
  * Guards outbound fetches against SSRF: only public, https hosts that do not

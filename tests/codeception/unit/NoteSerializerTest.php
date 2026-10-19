@@ -1,14 +1,14 @@
 <?php
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\services\NoteSerializer;
+use humhub\modules\activitypub\services\NoteSerializer;
 use tests\codeception\_support\HumHubDbTestCase;
 
 class NoteSerializerTest extends HumHubDbTestCase
 {
     public function testNoteAndCreateShape()
     {
-        $actorUrl = 'https://test.fedihub.social/fediverse/actor/guid-1';
+        $actorUrl = 'https://test.fedihub.social/activitypub/actor/guid-1';
         $s = new NoteSerializer();
 
         $note = $s->note(

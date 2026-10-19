@@ -1,5 +1,5 @@
 actor: Tester
-namespace: fediverse
+namespace: activitypub
 bootstrap: _bootstrap.php
 settings:
     colors: true

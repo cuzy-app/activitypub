@@ -1,8 +1,8 @@
 <?php
 
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\models\SpaceCommunity;
+use humhub\modules\activitypub\models\SpaceCommunity;
 use tests\codeception\_support\HumHubDbTestCase;
 
 class SpaceCommunityTest extends HumHubDbTestCase

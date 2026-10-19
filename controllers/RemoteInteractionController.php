@@ -1,13 +1,13 @@
 <?php
 
-namespace humhub\modules\fediverse\controllers;
+namespace humhub\modules\activitypub\controllers;
 
 use humhub\components\Controller;
-use humhub\modules\fediverse\services\CommunityResolver;
-use humhub\modules\fediverse\services\CommunitySubscriptionService;
-use humhub\modules\fediverse\services\DiscoveryPolicy;
-use humhub\modules\fediverse\services\RemoteActorResolver;
-use humhub\modules\fediverse\services\UrlSafety;
+use humhub\modules\activitypub\services\CommunityResolver;
+use humhub\modules\activitypub\services\CommunitySubscriptionService;
+use humhub\modules\activitypub\services\DiscoveryPolicy;
+use humhub\modules\activitypub\services\RemoteActorResolver;
+use humhub\modules\activitypub\services\UrlSafety;
 use humhub\modules\user\models\User;
 use Yii;
 use yii\web\BadRequestHttpException;
@@ -42,10 +42,10 @@ class RemoteInteractionController extends Controller
         try {
             $doc = $this->resolveDoc($uri);
         } catch (\Throwable $e) {
-            $error = Yii::t('FediverseModule.base', 'Could not resolve that account: {msg}', ['msg' => $e->getMessage()]);
+            $error = Yii::t('ActivitypubModule.base', 'Could not resolve that account: {msg}', ['msg' => $e->getMessage()]);
         }
         if ($doc === null && $error === null) {
-            $error = Yii::t('FediverseModule.base', 'That address is not a followable account.');
+            $error = Yii::t('ActivitypubModule.base', 'That address is not a followable account.');
         }
 
         // A Lemmy-family community (Group) → join its mirrored Space. No shadow user,
@@ -55,10 +55,10 @@ class RemoteInteractionController extends Controller
                 try {
                     $space = (new CommunitySubscriptionService())
                         ->provisionOrJoin($user, $doc, (string) ($doc['id'] ?? $uri), $this->handleFor($uri, $doc));
-                    $this->view->success(Yii::t('FediverseModule.base', 'Joined the community space “{name}”.', ['name' => $space->name]));
+                    $this->view->success(Yii::t('ActivitypubModule.base', 'Joined the community space “{name}”.', ['name' => $space->name]));
                     return $this->redirect($space->getUrl());
                 } catch (\Throwable $e) {
-                    $error = Yii::t('FediverseModule.base', 'Could not join that community: {msg}', ['msg' => $e->getMessage()]);
+                    $error = Yii::t('ActivitypubModule.base', 'Could not join that community: {msg}', ['msg' => $e->getMessage()]);
                 }
             }
             return $this->render('authorize', [
@@ -79,7 +79,7 @@ class RemoteInteractionController extends Controller
             try {
                 $remote = (new RemoteActorResolver())->resolveFromDocument((string) ($doc['id'] ?? $uri), $doc);
             } catch (\Throwable $e) {
-                $error = Yii::t('FediverseModule.base', 'Could not resolve that account: {msg}', ['msg' => $e->getMessage()]);
+                $error = Yii::t('ActivitypubModule.base', 'Could not resolve that account: {msg}', ['msg' => $e->getMessage()]);
             }
         }
 
@@ -87,7 +87,7 @@ class RemoteInteractionController extends Controller
             $shadow = User::findOne($remote->user_id);
             if ($shadow !== null) {
                 $shadow->follow($user->id); // outbound Follow via the usual event path
-                $this->view->success(Yii::t('FediverseModule.base', 'Now following {handle}.', ['handle' => $remote->handle]));
+                $this->view->success(Yii::t('ActivitypubModule.base', 'Now following {handle}.', ['handle' => $remote->handle]));
                 return $this->redirect($shadow->getUrl());
             }
         }

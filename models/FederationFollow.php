@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\models;
+namespace humhub\modules\activitypub\models;
 
 use humhub\components\ActiveRecord;
 use yii\behaviors\TimestampBehavior;
@@ -27,7 +27,7 @@ class FederationFollow extends ActiveRecord
 
     public static function tableName()
     {
-        return 'fediverse_follow';
+        return 'activitypub_follow';
     }
 
     public function behaviors()

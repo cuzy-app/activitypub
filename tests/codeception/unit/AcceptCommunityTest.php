@@ -1,9 +1,9 @@
 <?php
 
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\jobs\ProcessInboxActivity;
-use humhub\modules\fediverse\models\SpaceCommunity;
+use humhub\modules\activitypub\jobs\ProcessInboxActivity;
+use humhub\modules\activitypub\models\SpaceCommunity;
 use tests\codeception\_support\HumHubDbTestCase;
 
 class AcceptCommunityTest extends HumHubDbTestCase

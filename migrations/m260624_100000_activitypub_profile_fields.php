@@ -3,7 +3,7 @@
 use humhub\components\Migration;
 use yii\db\Query;
 
-class m260624_100000_fediverse_profile_fields extends Migration
+class m260624_100000_activitypub_profile_fields extends Migration
 {
     public function safeUp()
     {
@@ -24,8 +24,8 @@ class m260624_100000_fediverse_profile_fields extends Migration
 
         // 2. Fields + columns
         $fields = [
-            'fediverse_handle' => ['title' => 'Fediverse Handle', 'sort_order' => 410],
-            'fediverse_displayname' => ['title' => 'Fediverse Display Name', 'sort_order' => 420],
+            'activitypub_handle' => ['title' => 'Fediverse Handle', 'sort_order' => 410],
+            'activitypub_displayname' => ['title' => 'Fediverse Display Name', 'sort_order' => 420],
         ];
         foreach ($fields as $name => $cfg) {
             $exists = (new Query())->from('profile_field')->where(['internal_name' => $name])->exists();
@@ -51,7 +51,7 @@ class m260624_100000_fediverse_profile_fields extends Migration
 
     public function safeDown()
     {
-        foreach (['fediverse_handle', 'fediverse_displayname'] as $name) {
+        foreach (['activitypub_handle', 'activitypub_displayname'] as $name) {
             $this->delete('profile_field', ['internal_name' => $name]);
             if (in_array($name, $this->db->getTableSchema('profile')->columnNames, true)) {
                 $this->dropColumn('profile', $name);

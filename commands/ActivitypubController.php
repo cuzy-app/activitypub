@@ -1,27 +1,27 @@
 <?php
 
-namespace humhub\modules\fediverse\commands;
+namespace humhub\modules\activitypub\commands;
 
 use humhub\modules\comment\models\Comment;
 use humhub\modules\content\models\Content;
-use humhub\modules\fediverse\models\FederationFollow;
-use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\models\RemoteActor;
-use humhub\modules\fediverse\services\DiscoveryPolicy;
-use humhub\modules\fediverse\services\FederatedHtml;
+use humhub\modules\activitypub\models\FederationFollow;
+use humhub\modules\activitypub\models\LocalActor;
+use humhub\modules\activitypub\models\RemoteActor;
+use humhub\modules\activitypub\services\DiscoveryPolicy;
+use humhub\modules\activitypub\services\FederatedHtml;
 use humhub\modules\like\models\Like;
-use humhub\modules\fediverse\services\FederatedUserSource;
-use humhub\modules\fediverse\services\FederationUrl;
-use humhub\modules\fediverse\services\KeyManager;
-use humhub\modules\fediverse\services\RemoteActorResolver;
+use humhub\modules\activitypub\services\FederatedUserSource;
+use humhub\modules\activitypub\services\FederationUrl;
+use humhub\modules\activitypub\services\KeyManager;
+use humhub\modules\activitypub\services\RemoteActorResolver;
 use humhub\modules\user\models\User;
 use Yii;
 use yii\console\Controller;
 use yii\console\ExitCode;
 
-class FediverseController extends Controller
+class ActivitypubController extends Controller
 {
-    /** Usage: php protected/yii fediverse/status */
+    /** Usage: php protected/yii activitypub/status */
     public function actionStatus(): int
     {
         $this->stdout('Federation enabled: ' . (DiscoveryPolicy::isGloballyEnabled() ? 'yes' : 'no') . "\n");
@@ -32,7 +32,7 @@ class FediverseController extends Controller
     }
 
     /**
-     * Usage: php protected/yii fediverse/prune-remote-actors [apply]
+     * Usage: php protected/yii activitypub/prune-remote-actors [apply]
      * Deletes federated shadow users with NO follow relationship and NO authored
      * like/comment/content (safe orphans). Dry-run unless `apply` = 1.
      */
@@ -54,7 +54,7 @@ class FediverseController extends Controller
             if (count($prunable) > 20) {
                 $this->stdout('  ... and ' . (count($prunable) - 20) . " more\n");
             }
-            $this->stdout("Run `php protected/yii fediverse/prune-remote-actors 1` to delete.\n");
+            $this->stdout("Run `php protected/yii activitypub/prune-remote-actors 1` to delete.\n");
             return ExitCode::OK;
         }
         $deleted = 0;
@@ -92,7 +92,7 @@ class FediverseController extends Controller
     }
 
     /**
-     * Usage: php protected/yii fediverse/reprocess-remote-posts
+     * Usage: php protected/yii activitypub/reprocess-remote-posts
      * Re-fetches each ingested remote post and re-applies the current text/HTML
      * conversion and trailing-hashtag → topic parsing (for posts ingested before
      * those features landed). Idempotent.
@@ -100,7 +100,7 @@ class FediverseController extends Controller
     public function actionReprocessRemotePosts(): int
     {
         $count = 0;
-        foreach (\humhub\modules\fediverse\models\FederationObject::find()
+        foreach (\humhub\modules\activitypub\models\FederationObject::find()
                      ->where(['direction' => 'remote', 'object_type' => 'Note', 'model_class' => \humhub\modules\post\models\Post::class])
                      ->each() as $obj) {
             $post = \humhub\modules\post\models\Post::findOne($obj->model_id);
@@ -156,7 +156,7 @@ class FediverseController extends Controller
         }
     }
 
-    /** Usage: php protected/yii fediverse/ensure-instance-actor */
+    /** Usage: php protected/yii activitypub/ensure-instance-actor */
     public function actionEnsureInstanceActor(): int
     {
         $actor = (new KeyManager())->getOrCreateInstanceActor();
@@ -165,7 +165,7 @@ class FediverseController extends Controller
     }
 
     /**
-     * Usage: php protected/yii fediverse/migrate-shadow-users
+     * Usage: php protected/yii activitypub/migrate-shadow-users
      * Brings existing federated shadow users onto the clean identity model
      * (user_source, @handle username, null email) and backfills avatar/banner/bio.
      * Idempotent.
@@ -203,12 +203,12 @@ class FediverseController extends Controller
                     continue;
                 }
 
-                // Set fediverse identity fields from the cached remote record — runs even if the actor
+                // Set activitypub identity fields from the cached remote record — runs even if the actor
                 // fetch fails (e.g. 410 Gone), so identity/display is always fixed.
                 $profile = $user->profile;
                 if ($profile !== null) {
-                    $profile->fediverse_handle = mb_substr('@' . $remote->handle, 0, 255);
-                    $profile->fediverse_displayname = mb_substr((string) $remote->preferred_username, 0, 255);
+                    $profile->activitypub_handle = mb_substr('@' . $remote->handle, 0, 255);
+                    $profile->activitypub_displayname = mb_substr((string) $remote->preferred_username, 0, 255);
                     $profile->firstname = null;
                     $profile->lastname = null;
                     $profile->save(false);
@@ -220,7 +220,7 @@ class FediverseController extends Controller
                     $resolver->applyProfileImages($user, $doc);
                     if ($profile !== null) {
                         $name = trim((string) ($doc['name'] ?? '')) ?: (string) $remote->preferred_username;
-                        $profile->fediverse_displayname = mb_substr($name, 0, 255);
+                        $profile->activitypub_displayname = mb_substr($name, 0, 255);
                         $summary = FederatedHtml::toText($doc['summary'] ?? null);
                         $profile->about = $summary !== '' ? $summary : $profile->about;
                         $profile->save(false);

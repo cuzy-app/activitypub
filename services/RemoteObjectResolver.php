@@ -1,10 +1,10 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
 use humhub\modules\content\interfaces\ContentProvider;
 use humhub\modules\content\models\Content;
-use humhub\modules\fediverse\models\FederationObject;
+use humhub\modules\activitypub\models\FederationObject;
 
 /**
  * Resolves an inbound ActivityPub object id we previously ingested

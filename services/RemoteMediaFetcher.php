@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
 use Yii;
 
@@ -41,7 +41,7 @@ class RemoteMediaFetcher
             }
             return ['content' => $content, 'mime' => $mime];
         } catch (\Throwable $e) {
-            Yii::warning('Fediverse media fetch failed for ' . $url . ': ' . $e->getMessage(), 'fediverse');
+            Yii::warning('ActivityPub media fetch failed for ' . $url . ': ' . $e->getMessage(), 'activitypub');
             return null;
         }
     }

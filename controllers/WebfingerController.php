@@ -1,12 +1,12 @@
 <?php
 
-namespace humhub\modules\fediverse\controllers;
+namespace humhub\modules\activitypub\controllers;
 
 use humhub\components\Controller;
-use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\services\DiscoveryPolicy;
-use humhub\modules\fediverse\services\FederationUrl;
-use humhub\modules\fediverse\services\KeyManager;
+use humhub\modules\activitypub\models\LocalActor;
+use humhub\modules\activitypub\services\DiscoveryPolicy;
+use humhub\modules\activitypub\services\FederationUrl;
+use humhub\modules\activitypub\services\KeyManager;
 use humhub\modules\user\models\User;
 use Yii;
 use yii\web\BadRequestHttpException;

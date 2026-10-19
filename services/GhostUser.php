@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
 use humhub\modules\user\models\User;
 use RuntimeException;
@@ -20,7 +20,7 @@ class GhostUser
     /** The configured ghost user, or null if unset/missing. */
     public static function find(): ?User
     {
-        $id = (int) Yii::$app->getModule('fediverse')->settings->get(self::SETTING, 0);
+        $id = (int) Yii::$app->getModule('activitypub')->settings->get(self::SETTING, 0);
         return $id > 0 ? User::findOne($id) : null;
     }
 
@@ -34,12 +34,12 @@ class GhostUser
 
         $user = new User();
         $user->username = self::uniqueUsername('Fediverse');
-        $user->email = 'fediverse-system@' . FederationUrl::domain();
+        $user->email = 'activitypub-system@' . FederationUrl::domain();
         $user->status = User::STATUS_ENABLED;
         $user->visibility = User::VISIBILITY_HIDDEN; // off the People directory
         $user->allowAssignDefaultGroup(false);
         if (!$user->save()) {
-            throw new RuntimeException('Could not create Fediverse ghost user: ' . implode(', ', $user->getErrorSummary(true)));
+            throw new RuntimeException('Could not create ActivityPub ghost user: ' . implode(', ', $user->getErrorSummary(true)));
         }
 
         $profile = $user->profile;
@@ -49,7 +49,7 @@ class GhostUser
 
         // No password auth is created → the account cannot be logged into.
 
-        Yii::$app->getModule('fediverse')->settings->set(self::SETTING, (int) $user->id);
+        Yii::$app->getModule('activitypub')->settings->set(self::SETTING, (int) $user->id);
         return $user;
     }
 

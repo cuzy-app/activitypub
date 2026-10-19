@@ -1,10 +1,10 @@
 <?php
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
 use humhub\modules\comment\models\Comment;
 use humhub\modules\content\models\Content;
-use humhub\modules\fediverse\models\FederationObject;
-use humhub\modules\fediverse\services\InboundInteractionService;
+use humhub\modules\activitypub\models\FederationObject;
+use humhub\modules\activitypub\services\InboundInteractionService;
 use humhub\modules\post\models\Post;
 use humhub\modules\user\models\User;
 use tests\codeception\_support\HumHubDbTestCase;

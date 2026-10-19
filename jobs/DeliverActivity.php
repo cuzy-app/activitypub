@@ -1,9 +1,9 @@
 <?php
 
-namespace humhub\modules\fediverse\jobs;
+namespace humhub\modules\activitypub\jobs;
 
-use humhub\modules\fediverse\models\FederationFollow;
-use humhub\modules\fediverse\models\LocalActor;
+use humhub\modules\activitypub\models\FederationFollow;
+use humhub\modules\activitypub\models\LocalActor;
 use humhub\modules\queue\ActiveJob;
 use Yii;
 

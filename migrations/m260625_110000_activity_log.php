@@ -6,7 +6,7 @@ class m260625_110000_activity_log extends Migration
 {
     public function safeUp()
     {
-        $this->createTable('fediverse_activity_log', [
+        $this->createTable('activitypub_activity_log', [
             'id' => $this->primaryKey(),
             'direction' => $this->string(8)->notNull(),       // 'in' | 'out'
             'activity_type' => $this->string(64)->null(),
@@ -16,11 +16,11 @@ class m260625_110000_activity_log extends Migration
             'body' => $this->getDb()->getSchema()->createColumnSchemaBuilder('mediumtext')->null(),
             'created_at' => $this->dateTime()->notNull(),
         ]);
-        $this->createIndex('idx_activity_log_created', 'fediverse_activity_log', 'created_at');
+        $this->createIndex('idx_activity_log_created', 'activitypub_activity_log', 'created_at');
     }
 
     public function safeDown()
     {
-        $this->dropTable('fediverse_activity_log');
+        $this->dropTable('activitypub_activity_log');
     }
 }

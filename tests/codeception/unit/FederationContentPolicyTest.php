@@ -1,8 +1,8 @@
 <?php
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
 use humhub\modules\content\models\Content;
-use humhub\modules\fediverse\services\FederationContentPolicy;
+use humhub\modules\activitypub\services\FederationContentPolicy;
 use humhub\modules\user\models\User;
 use tests\codeception\_support\HumHubDbTestCase;
 use Yii;
@@ -16,9 +16,9 @@ class FederationContentPolicyTest extends HumHubDbTestCase
         $this->assertNotNull($user, 'a test user fixture is required');
 
         $this->assertFalse(FederationContentPolicy::isContainerOptedIn($user));
-        Yii::$app->getModule('fediverse')->settings->contentContainer($user)->set('federationEnabled', 1);
+        Yii::$app->getModule('activitypub')->settings->contentContainer($user)->set('federationEnabled', 1);
         $this->assertTrue(FederationContentPolicy::isContainerOptedIn($user));
-        Yii::$app->getModule('fediverse')->settings->contentContainer($user)->set('federationEnabled', 0);
+        Yii::$app->getModule('activitypub')->settings->contentContainer($user)->set('federationEnabled', 0);
         $this->assertFalse(FederationContentPolicy::isContainerOptedIn($user));
     }
 }

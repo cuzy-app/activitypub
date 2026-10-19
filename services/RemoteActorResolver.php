@@ -1,8 +1,8 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
-use humhub\modules\fediverse\models\RemoteActor;
+use humhub\modules\activitypub\models\RemoteActor;
 use humhub\modules\user\models\Group;
 use humhub\modules\user\models\User;
 use RuntimeException;
@@ -181,7 +181,7 @@ class RemoteActorResolver
         try {
             $doc = $this->fetchActorDocument($remote->ap_id);
         } catch (\Throwable $e) {
-            Yii::warning('Fediverse refresh failed for ' . $remote->ap_id . ': ' . $e->getMessage(), 'fediverse');
+            Yii::warning('ActivityPub refresh failed for ' . $remote->ap_id . ': ' . $e->getMessage(), 'activitypub');
             // Bump the timestamp so a dead/unreachable actor is not re-fetched on every view.
             $remote->last_refreshed_at = date('Y-m-d H:i:s');
             $remote->save(false);
@@ -225,7 +225,7 @@ class RemoteActorResolver
             $name = trim((string) ($doc['name'] ?? '')) ?: (string) ($remote->preferred_username ?? '');
             $name = FederatedHtml::stripCustomEmoji($name, $doc['tag'] ?? []);
             if ($name !== '') {
-                $profile->fediverse_displayname = mb_substr($name, 0, 255);
+                $profile->activitypub_displayname = mb_substr($name, 0, 255);
             }
             $summary = FederatedHtml::toText($doc['summary'] ?? null);
             if ($summary !== '') {
@@ -307,17 +307,17 @@ class RemoteActorResolver
         }
 
         $profile = $user->profile;
-        $profile->fediverse_displayname = mb_substr($name, 0, 255);
-        $profile->fediverse_handle = mb_substr('@' . $preferred . '@' . $domain, 0, 255);
+        $profile->activitypub_displayname = mb_substr($name, 0, 255);
+        $profile->activitypub_handle = mb_substr('@' . $preferred . '@' . $domain, 0, 255);
         // firstname/lastname intentionally left empty for federated users — their
         // identity lives in the Fediverse fields. They are globally `required` but
         // nullable columns, so save without validation.
         if (!$profile->save(false)) {
-            Yii::warning('Federated user profile save failed', 'fediverse');
+            Yii::warning('Federated user profile save failed', 'activitypub');
         }
 
         // Categorise federated users in the admin-configured group (for People filtering).
-        $groupId = (int) Yii::$app->getModule('fediverse')->settings->get('remoteUserGroupId', 0);
+        $groupId = (int) Yii::$app->getModule('activitypub')->settings->get('remoteUserGroupId', 0);
         if ($groupId > 0) {
             $group = Group::findOne($groupId);
             if ($group !== null) {
@@ -365,7 +365,7 @@ class RemoteActorResolver
             file_put_contents($tmp, $media['content']);
             $assetImage->setByFile($tmp);
         } catch (\Throwable $e) {
-            Yii::warning('Fediverse profile image set failed: ' . $e->getMessage(), 'fediverse');
+            Yii::warning('ActivityPub profile image set failed: ' . $e->getMessage(), 'activitypub');
         } finally {
             @unlink($tmp);
         }

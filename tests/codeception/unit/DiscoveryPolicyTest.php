@@ -1,8 +1,8 @@
 <?php
 
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\services\DiscoveryPolicy;
+use humhub\modules\activitypub\services\DiscoveryPolicy;
 use humhub\modules\user\models\User;
 use tests\codeception\_support\HumHubDbTestCase;
 use Yii;
@@ -11,7 +11,7 @@ class DiscoveryPolicyTest extends HumHubDbTestCase
 {
     public function testRequiresGlobalSwitchAndGuestVisibleProfile()
     {
-        $module = Yii::$app->getModule('fediverse');
+        $module = Yii::$app->getModule('activitypub');
 
         $user = new User();
         $user->visibility = User::VISIBILITY_ALL;

@@ -1,8 +1,8 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
-use humhub\modules\fediverse\models\ActivityLogEntry;
+use humhub\modules\activitypub\models\ActivityLogEntry;
 use Yii;
 
 /** Opt-in, capped logging of federation activities for debugging. Never throws. */
@@ -12,7 +12,7 @@ class ActivityLog
 
     public static function isEnabled(): bool
     {
-        return (bool) Yii::$app->getModule('fediverse')->settings->get('activityLogEnabled', false);
+        return (bool) Yii::$app->getModule('activitypub')->settings->get('activityLogEnabled', false);
     }
 
     public static function record(string $direction, ?string $type, ?string $actor, ?string $body, string $status, ?string $note = null): void
@@ -35,7 +35,7 @@ class ActivityLog
                 ActivityLogEntry::deleteAll(['<', 'id', $e->id - self::MAX_ENTRIES]);
             }
         } catch (\Throwable $ex) {
-            Yii::warning('Fediverse activity log failed: ' . $ex->getMessage(), 'fediverse');
+            Yii::warning('ActivityPub activity log failed: ' . $ex->getMessage(), 'activitypub');
         }
     }
 }

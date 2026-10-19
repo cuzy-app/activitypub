@@ -1,9 +1,9 @@
 <?php
 
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\services\PersonSerializer;
+use humhub\modules\activitypub\models\LocalActor;
+use humhub\modules\activitypub\services\PersonSerializer;
 use tests\codeception\_support\HumHubDbTestCase;
 
 class PersonSerializerTest extends HumHubDbTestCase
@@ -13,7 +13,7 @@ class PersonSerializerTest extends HumHubDbTestCase
         $actor = new LocalActor();
         $actor->type = LocalActor::TYPE_PERSON;
         $actor->preferred_username = 'alice';
-        $actor->ap_id = 'https://humhub.example/fediverse/actor/guid-1';
+        $actor->ap_id = 'https://humhub.example/activitypub/actor/guid-1';
         $actor->public_key = "-----BEGIN PUBLIC KEY-----\nABC\n-----END PUBLIC KEY-----\n";
 
         $doc = (new PersonSerializer())->serialize($actor, 'Alice Example', 'https://humhub.example/u/alice');

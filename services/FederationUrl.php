@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
 use Yii;
 use yii\helpers\Url;
@@ -59,24 +59,24 @@ class FederationUrl
     /** Absolute ActivityPub actor id/URL for a user GUID. */
     public static function actorUrl(string $guid): string
     {
-        return self::base() . '/fediverse/actor/' . $guid;
+        return self::base() . '/activitypub/actor/' . $guid;
     }
 
     /** Absolute ActivityPub actor id/URL for a Space's Group actor. */
     public static function spaceActorUrl(string $guid): string
     {
-        return self::base() . '/fediverse/actor/space/' . $guid;
+        return self::base() . '/activitypub/actor/space/' . $guid;
     }
 
     /** Absolute ActivityPub actor id/URL for the instance (Application) actor. */
     public static function instanceActorUrl(): string
     {
-        return self::base() . '/fediverse/instance-actor';
+        return self::base() . '/activitypub/instance-actor';
     }
 
     /** The shared inbox URL advertised by every actor. */
     public static function sharedInboxUrl(): string
     {
-        return self::base() . '/fediverse/inbox';
+        return self::base() . '/activitypub/inbox';
     }
 }

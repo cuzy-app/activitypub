@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
 use humhub\modules\content\components\ContentContainerActiveRecord;
 use humhub\modules\content\models\Content;
@@ -38,7 +38,7 @@ class FederationContentPolicy
 
     public static function isContainerOptedIn(ContentContainerActiveRecord $container): bool
     {
-        return (bool) Yii::$app->getModule('fediverse')
+        return (bool) Yii::$app->getModule('activitypub')
             ->settings->contentContainer($container)->get('federationEnabled', false);
     }
 }

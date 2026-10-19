@@ -1,24 +1,24 @@
 <?php
 
-namespace humhub\modules\fediverse\jobs;
+namespace humhub\modules\activitypub\jobs;
 
 use humhub\modules\comment\models\Comment;
 use humhub\modules\content\services\ContentTagService;
-use humhub\modules\fediverse\models\FederationFollow;
-use humhub\modules\fediverse\models\FederationObject;
-use humhub\modules\fediverse\models\SpaceCommunity;
-use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\models\RemoteActor;
+use humhub\modules\activitypub\models\FederationFollow;
+use humhub\modules\activitypub\models\FederationObject;
+use humhub\modules\activitypub\models\SpaceCommunity;
+use humhub\modules\activitypub\models\LocalActor;
+use humhub\modules\activitypub\models\RemoteActor;
 use humhub\modules\post\models\Post;
 use humhub\modules\topic\models\Topic;
-use humhub\modules\fediverse\services\ActivityLog;
-use humhub\modules\fediverse\services\FederatedHtml;
-use humhub\modules\fediverse\services\FederationUrl;
-use humhub\modules\fediverse\services\InboundInteractionService;
-use humhub\modules\fediverse\services\LocalObjectResolver;
-use humhub\modules\fediverse\services\RemoteActorResolver;
-use humhub\modules\fediverse\services\RemoteObjectResolver;
-use humhub\modules\fediverse\services\SignatureService;
+use humhub\modules\activitypub\services\ActivityLog;
+use humhub\modules\activitypub\services\FederatedHtml;
+use humhub\modules\activitypub\services\FederationUrl;
+use humhub\modules\activitypub\services\InboundInteractionService;
+use humhub\modules\activitypub\services\LocalObjectResolver;
+use humhub\modules\activitypub\services\RemoteActorResolver;
+use humhub\modules\activitypub\services\RemoteObjectResolver;
+use humhub\modules\activitypub\services\SignatureService;
 use humhub\modules\queue\ActiveJob;
 use humhub\modules\user\models\Profile;
 use humhub\modules\user\models\User;
@@ -43,7 +43,7 @@ class ProcessInboxActivity extends ActiveJob
     {
         $activity = json_decode($this->rawBody, true);
         if (!is_array($activity) || empty($activity['type']) || empty($activity['actor'])) {
-            Yii::warning('Fediverse inbox: malformed activity', 'fediverse');
+            Yii::warning('ActivityPub inbox: malformed activity', 'activitypub');
             return;
         }
 
@@ -57,7 +57,7 @@ class ProcessInboxActivity extends ActiveJob
         // only when something is actually stored.
         $signerDoc = $this->authenticate($actorUrl);
         if ($signerDoc === null) {
-            Yii::warning('Fediverse inbox: authentication failed for ' . $actorUrl, 'fediverse');
+            Yii::warning('ActivityPub inbox: authentication failed for ' . $actorUrl, 'activitypub');
             ActivityLog::record('in', $activity['type'] ?? null, $actorUrl, $this->rawBody, 'rejected', 'signature/verification failed');
             return;
         }
@@ -86,7 +86,7 @@ class ProcessInboxActivity extends ActiveJob
                 $this->handleUpdate($activity, $signerId);
                 break;
             default:
-                Yii::info('Fediverse inbox: ignoring unsupported type ' . $activity['type'], 'fediverse');
+                Yii::info('ActivityPub inbox: ignoring unsupported type ' . $activity['type'], 'activitypub');
         }
 
         ActivityLog::record('in', $activity['type'], $actorUrl, $this->rawBody, 'processed');
@@ -109,17 +109,17 @@ class ProcessInboxActivity extends ActiveJob
 
         // Body must be authenticated: digest required in the signed set and matching.
         if (!in_array('digest', $headerList, true)) {
-            Yii::warning('Fediverse inbox: digest not in signed headers [' . $parsed['headers'] . ']', 'fediverse');
+            Yii::warning('ActivityPub inbox: digest not in signed headers [' . $parsed['headers'] . ']', 'activitypub');
             return null;
         }
         if (!hash_equals(SignatureService::digest($this->rawBody), (string) ($this->headers['digest'] ?? ''))) {
-            Yii::warning('Fediverse inbox: digest mismatch (got ' . (string) ($this->headers['digest'] ?? '') . ')', 'fediverse');
+            Yii::warning('ActivityPub inbox: digest mismatch (got ' . (string) ($this->headers['digest'] ?? '') . ')', 'activitypub');
             return null;
         }
 
         // Reject stale/future-dated requests (basic replay window).
         if (!$this->isFreshDate((string) ($this->headers['date'] ?? ''))) {
-            Yii::warning('Fediverse inbox: stale/invalid date (' . (string) ($this->headers['date'] ?? '') . ')', 'fediverse');
+            Yii::warning('ActivityPub inbox: stale/invalid date (' . (string) ($this->headers['date'] ?? '') . ')', 'activitypub');
             return null;
         }
 
@@ -129,7 +129,7 @@ class ProcessInboxActivity extends ActiveJob
         try {
             $signerDoc = $resolver->fetchActorDocument($signerUrl);
         } catch (\Throwable $e) {
-            Yii::warning('Fediverse inbox: signer fetch failed: ' . $e->getMessage(), 'fediverse');
+            Yii::warning('ActivityPub inbox: signer fetch failed: ' . $e->getMessage(), 'activitypub');
             return null;
         }
         $pem = $signerDoc['publicKey']['publicKeyPem'] ?? null;
@@ -160,19 +160,19 @@ class ProcessInboxActivity extends ActiveJob
         }
         if (!$verified) {
             $missing = SignatureService::missingSignedHeaders($this->headers, $headerList);
-            Yii::warning('Fediverse inbox: signature verify failed (actor ' . $actorUrl
+            Yii::warning('ActivityPub inbox: signature verify failed (actor ' . $actorUrl
                 . ', signed headers [' . $parsed['headers'] . ']'
                 . ', received host "' . $receivedHost . '" path "' . $this->requestPath . '"'
                 . ', canonical host "' . $canonicalHost . '" path "' . $this->canonicalPath . '"'
                 . ($missing !== [] ? ', missing signed headers [' . implode(' ', $missing) . ']' : '')
-                . ')', 'fediverse');
+                . ')', 'activitypub');
             return null;
         }
 
         // Binding: the signer (keyId owner) must equal the activity actor.
         $signerId = (string) ($signerDoc['id'] ?? $signerUrl);
         if ($signerId !== $actorUrl) {
-            Yii::warning('Fediverse inbox: actor/keyId mismatch (' . $actorUrl . ' vs ' . $signerId . ')', 'fediverse');
+            Yii::warning('ActivityPub inbox: actor/keyId mismatch (' . $actorUrl . ' vs ' . $signerId . ')', 'activitypub');
             return null;
         }
 
@@ -212,7 +212,7 @@ class ProcessInboxActivity extends ActiveJob
     {
         $localUser = $this->resolveFollowTarget($activity['object'] ?? null);
         if ($localUser === null) {
-            Yii::warning('Fediverse Follow: unknown target object', 'fediverse');
+            Yii::warning('ActivityPub Follow: unknown target object', 'activitypub');
             return;
         }
         $remote = $this->persistActor($signerId, $signerDoc);
@@ -266,7 +266,7 @@ class ProcessInboxActivity extends ActiveJob
             if ($record !== null && $author !== null) {
                 (new InboundInteractionService())->removeLike($record, $author);
             } else {
-                Yii::warning('Fediverse Undo{Like}: could not resolve likeable/author', 'fediverse');
+                Yii::warning('ActivityPub Undo{Like}: could not resolve likeable/author', 'activitypub');
             }
         }
     }
@@ -338,13 +338,13 @@ class ProcessInboxActivity extends ActiveJob
             return; // not something we ingested
         }
         if (!$this->isAuthoredBy($record, $remote)) {
-            Yii::warning('Fediverse Delete: actor is not the author of the target ' . $apId, 'fediverse');
+            Yii::warning('ActivityPub Delete: actor is not the author of the target ' . $apId, 'activitypub');
             return;
         }
         try {
             $record->delete();
         } catch (\Throwable $e) {
-            Yii::warning('Fediverse Delete failed for ' . $apId . ': ' . $e->getMessage(), 'fediverse');
+            Yii::warning('ActivityPub Delete failed for ' . $apId . ': ' . $e->getMessage(), 'activitypub');
             return;
         }
         FederationObject::deleteAll(['ap_id' => $apId, 'direction' => FederationObject::DIRECTION_REMOTE]);
@@ -374,16 +374,16 @@ class ProcessInboxActivity extends ActiveJob
             return;
         }
         if (!$this->isAuthoredBy($record, $remote)) {
-            Yii::warning('Fediverse Update: actor is not the author of the target', 'fediverse');
+            Yii::warning('ActivityPub Update: actor is not the author of the target', 'activitypub');
             return;
         }
         $record->message = FederatedHtml::toText($object['content'] ?? null);
         try {
             if (!$record->save()) {
-                Yii::warning('Fediverse Update save failed: ' . implode(', ', $record->getErrorSummary(true)), 'fediverse');
+                Yii::warning('ActivityPub Update save failed: ' . implode(', ', $record->getErrorSummary(true)), 'activitypub');
             }
         } catch (\Throwable $e) {
-            Yii::warning('Fediverse Update error: ' . $e->getMessage(), 'fediverse');
+            Yii::warning('ActivityPub Update error: ' . $e->getMessage(), 'activitypub');
         }
     }
 
@@ -392,7 +392,7 @@ class ProcessInboxActivity extends ActiveJob
     {
         // An actor may only update itself.
         if ((string) ($doc['id'] ?? '') !== $remote->ap_id) {
-            Yii::warning('Fediverse Update{Person}: object id does not match the signing actor', 'fediverse');
+            Yii::warning('ActivityPub Update{Person}: object id does not match the signing actor', 'activitypub');
             return;
         }
 
@@ -432,7 +432,7 @@ class ProcessInboxActivity extends ActiveJob
                 $profile->about = $summary;
             }
             if (!$profile->save()) {
-                Yii::warning('Fediverse Update{Person}: profile save failed: ' . implode(', ', $profile->getErrorSummary(true)), 'fediverse');
+                Yii::warning('ActivityPub Update{Person}: profile save failed: ' . implode(', ', $profile->getErrorSummary(true)), 'activitypub');
             }
         }
 
@@ -463,7 +463,7 @@ class ProcessInboxActivity extends ActiveJob
         $apId = $this->objectId($activity['object'] ?? null);
         $record = (new LocalObjectResolver())->resolveLikeable($apId);
         if ($record === null) {
-            Yii::warning('Fediverse Like: could not resolve likeable for ' . $apId, 'fediverse');
+            Yii::warning('ActivityPub Like: could not resolve likeable for ' . $apId, 'activitypub');
             return; // don't mint a shadow user for a like we can't attach
         }
         $remote = $this->persistActor($signerId, $signerDoc);
@@ -529,7 +529,7 @@ class ProcessInboxActivity extends ActiveJob
             return;
         }
         $noteId = (string) ($note['id'] ?? '');
-        if ($noteId === '' || \humhub\modules\fediverse\models\FederationObject::find()->where(['ap_id' => $noteId])->exists()) {
+        if ($noteId === '' || \humhub\modules\activitypub\models\FederationObject::find()->where(['ap_id' => $noteId])->exists()) {
             return; // malformed or already ingested
         }
         $shadow = User::findOne($remote->user_id);
@@ -548,17 +548,17 @@ class ProcessInboxActivity extends ActiveJob
         $post->silentContentCreation = true;       // no per-post notification (Mastodon-like timeline behavior)
         try {
             if (!$post->save()) {
-                Yii::warning('Fediverse ingest post failed: ' . implode(', ', $post->getErrorSummary(true)), 'fediverse');
+                Yii::warning('ActivityPub ingest post failed: ' . implode(', ', $post->getErrorSummary(true)), 'activitypub');
                 return;
             }
         } catch (\Throwable $e) {
-            Yii::warning('Fediverse ingest post error: ' . $e->getMessage(), 'fediverse');
+            Yii::warning('ActivityPub ingest post error: ' . $e->getMessage(), 'activitypub');
             return;
         }
 
-        $obj = new \humhub\modules\fediverse\models\FederationObject();
+        $obj = new \humhub\modules\activitypub\models\FederationObject();
         $obj->ap_id = $noteId;
-        $obj->direction = \humhub\modules\fediverse\models\FederationObject::DIRECTION_REMOTE;
+        $obj->direction = \humhub\modules\activitypub\models\FederationObject::DIRECTION_REMOTE;
         $obj->object_type = 'Note';
         $obj->model_class = \humhub\modules\post\models\Post::class;
         $obj->model_id = $post->id;

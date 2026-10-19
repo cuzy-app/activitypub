@@ -1,9 +1,9 @@
 <?php
 
-namespace humhub\modules\fediverse\controllers;
+namespace humhub\modules\activitypub\controllers;
 
 use humhub\components\Controller;
-use humhub\modules\fediverse\services\FederationUrl;
+use humhub\modules\activitypub\services\FederationUrl;
 use Yii;
 use yii\web\Response;
 
@@ -34,14 +34,14 @@ class NodeinfoController extends Controller
     /** GET /nodeinfo/2.1 — the NodeInfo 2.1 schema document. */
     public function actionSchema()
     {
-        $module = Yii::$app->getModule('fediverse');
+        $module = Yii::$app->getModule('activitypub');
         $manifest = json_decode((string) @file_get_contents($module->getBasePath() . '/module.json'), true);
         $version = (string) ($manifest['version'] ?? '0.0.0');
 
         return $this->respondJson([
             'version' => '2.1',
             'software' => [
-                'name' => 'humhub-fediverse',
+                'name' => 'humhub-activitypub',
                 'version' => $version,
             ],
             'protocols' => ['activitypub'],

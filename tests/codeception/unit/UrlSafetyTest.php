@@ -1,8 +1,8 @@
 <?php
 
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\services\UrlSafety;
+use humhub\modules\activitypub\services\UrlSafety;
 use tests\codeception\_support\HumHubDbTestCase;
 
 class UrlSafetyTest extends HumHubDbTestCase

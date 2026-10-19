@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\models;
+namespace humhub\modules\activitypub\models;
 
 use humhub\components\ActiveRecord;
 use humhub\modules\space\models\Space;
@@ -38,7 +38,7 @@ class SpaceCommunity extends ActiveRecord
 
     public static function tableName()
     {
-        return 'fediverse_space_community';
+        return 'activitypub_space_community';
     }
 
     public function behaviors()

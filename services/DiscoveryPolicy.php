@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
 use humhub\modules\user\helpers\AuthHelper;
 use humhub\modules\user\models\User;
@@ -16,7 +16,7 @@ class DiscoveryPolicy
 {
     public static function isGloballyEnabled(): bool
     {
-        return (bool) Yii::$app->getModule('fediverse')->settings->get('enabled', false);
+        return (bool) Yii::$app->getModule('activitypub')->settings->get('enabled', false);
     }
 
     public static function isDiscoverable(User $user): bool
@@ -34,14 +34,14 @@ class DiscoveryPolicy
     public static function discoverabilityError(User $user): ?string
     {
         if (!self::isGloballyEnabled()) {
-            return Yii::t('FediverseModule.base', 'Federation is currently disabled for this site. An administrator must enable it in the Fediverse module settings before you can follow remote accounts.');
+            return Yii::t('ActivitypubModule.base', 'Federation is currently disabled for this site. An administrator must enable it in the ActivityPub module settings before you can follow remote accounts.');
         }
         if (!AuthHelper::isGuestAccessEnabled()) {
-            return Yii::t('FediverseModule.base', 'This site does not allow guest access, so no profile can be exposed to the Fediverse. An administrator must enable guest access (Administration → Settings → Users) first.');
+            return Yii::t('ActivitypubModule.base', 'This site does not allow guest access, so no profile can be exposed to the Fediverse. An administrator must enable guest access (Administration → Settings → Users) first.');
         }
         // Only profiles visible to guests (no login required) may federate.
         if ((int) $user->visibility !== User::VISIBILITY_ALL) {
-            return Yii::t('FediverseModule.base', 'Your profile must be visible to all (including guests) before you can follow remote accounts. Set "Visibility" to "Visible for members+guests" in your account settings.');
+            return Yii::t('ActivitypubModule.base', 'Your profile must be visible to all (including guests) before you can follow remote accounts. Set "Visibility" to "Visible for members+guests" in your account settings.');
         }
         return null;
     }

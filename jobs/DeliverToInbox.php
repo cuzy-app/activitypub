@@ -1,11 +1,11 @@
 <?php
 
-namespace humhub\modules\fediverse\jobs;
+namespace humhub\modules\activitypub\jobs;
 
-use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\services\ActivityDelivery;
-use humhub\modules\fediverse\services\ActivityLog;
-use humhub\modules\fediverse\services\UrlSafety;
+use humhub\modules\activitypub\models\LocalActor;
+use humhub\modules\activitypub\services\ActivityDelivery;
+use humhub\modules\activitypub\services\ActivityLog;
+use humhub\modules\activitypub\services\UrlSafety;
 use humhub\modules\queue\ActiveJob;
 use RuntimeException;
 use Yii;
@@ -45,7 +45,7 @@ class DeliverToInbox extends ActiveJob implements RetryableJobInterface
             return; // nothing deliverable — permanent, no retry
         }
         if (!UrlSafety::isSafePublicUrl($this->inboxUrl)) {
-            Yii::warning('Fediverse delivery: refusing unsafe inbox URL ' . $this->inboxUrl, 'fediverse');
+            Yii::warning('ActivityPub delivery: refusing unsafe inbox URL ' . $this->inboxUrl, 'activitypub');
             return; // permanent
         }
 
@@ -59,12 +59,12 @@ class DeliverToInbox extends ActiveJob implements RetryableJobInterface
             return; // delivered
         }
         if ($status >= 400 && $status < 500) {
-            Yii::warning('Fediverse delivery ' . $status . ' (permanent) to ' . $this->inboxUrl, 'fediverse');
+            Yii::warning('ActivityPub delivery ' . $status . ' (permanent) to ' . $this->inboxUrl, 'activitypub');
             ActivityLog::record('out', $type, $this->inboxUrl, $this->activityJson, 'failed_permanent', (string) $status);
             return; // 4xx incl. 410 Gone — do not retry
         }
         // 5xx / other → transient: throw so the queue retries per canRetry().
         ActivityLog::record('out', $type, $this->inboxUrl, $this->activityJson, 'failed_transient', (string) $status);
-        throw new RuntimeException('Fediverse delivery transient failure (' . $status . ') to ' . $this->inboxUrl);
+        throw new RuntimeException('ActivityPub delivery transient failure (' . $status . ') to ' . $this->inboxUrl);
     }
 }

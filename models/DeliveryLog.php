@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\models;
+namespace humhub\modules\activitypub\models;
 
 use humhub\components\ActiveRecord;
 use yii\behaviors\TimestampBehavior;
@@ -24,7 +24,7 @@ class DeliveryLog extends ActiveRecord
 
     public static function tableName()
     {
-        return 'fediverse_delivery_log';
+        return 'activitypub_delivery_log';
     }
 
     public function behaviors()

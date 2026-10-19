@@ -1,9 +1,9 @@
 <?php
 
-namespace humhub\modules\fediverse\widgets;
+namespace humhub\modules\activitypub\widgets;
 
 use humhub\components\Widget;
-use humhub\modules\fediverse\models\RemoteActor;
+use humhub\modules\activitypub\models\RemoteActor;
 use humhub\modules\user\models\User;
 
 /** Sidebar panel shown on a federated shadow user's profile: origin link + metadata. */

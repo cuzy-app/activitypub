@@ -1,7 +1,7 @@
 <?php
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\services\RemoteMediaFetcher;
+use humhub\modules\activitypub\services\RemoteMediaFetcher;
 use tests\codeception\_support\HumHubDbTestCase;
 
 class RemoteMediaFetcherTest extends HumHubDbTestCase

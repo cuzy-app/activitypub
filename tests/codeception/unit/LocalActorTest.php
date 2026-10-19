@@ -1,8 +1,8 @@
 <?php
 
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\models\LocalActor;
+use humhub\modules\activitypub\models\LocalActor;
 use tests\codeception\_support\HumHubDbTestCase;
 
 class LocalActorTest extends HumHubDbTestCase
@@ -12,7 +12,7 @@ class LocalActorTest extends HumHubDbTestCase
         $actor = new LocalActor();
         $actor->type = 'Application';
         $actor->preferred_username = 'instance.actor';
-        $actor->ap_id = 'https://example.com/fediverse/actor/instance';
+        $actor->ap_id = 'https://example.com/activitypub/actor/instance';
         $actor->public_key = 'PUB';
         $actor->private_key = 'PRIV';
         $actor->federation_enabled = true;

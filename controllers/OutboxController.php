@@ -1,11 +1,11 @@
 <?php
 
-namespace humhub\modules\fediverse\controllers;
+namespace humhub\modules\activitypub\controllers;
 
 use humhub\components\Controller;
-use humhub\modules\fediverse\models\FederationObject;
-use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\services\DiscoveryPolicy;
+use humhub\modules\activitypub\models\FederationObject;
+use humhub\modules\activitypub\models\LocalActor;
+use humhub\modules\activitypub\services\DiscoveryPolicy;
 use humhub\modules\post\models\Post;
 use humhub\modules\user\models\User;
 use Yii;
@@ -22,7 +22,7 @@ class OutboxController extends Controller
         return parent::beforeAction($action);
     }
 
-    /** GET /fediverse/actor/<guid>/outbox */
+    /** GET /activitypub/actor/<guid>/outbox */
     public function actionIndex($guid)
     {
         $user = User::findOne(['guid' => $guid]);

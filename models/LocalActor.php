@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse\models;
+namespace humhub\modules\activitypub\models;
 
 use humhub\components\ActiveRecord;
 use yii\behaviors\TimestampBehavior;
@@ -29,7 +29,7 @@ class LocalActor extends ActiveRecord
 
     public static function tableName()
     {
-        return 'fediverse_local_actor';
+        return 'activitypub_local_actor';
     }
 
     public function behaviors()

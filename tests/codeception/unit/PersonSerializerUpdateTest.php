@@ -1,8 +1,8 @@
 <?php
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\services\PersonSerializer;
+use humhub\modules\activitypub\models\LocalActor;
+use humhub\modules\activitypub\services\PersonSerializer;
 use tests\codeception\_support\HumHubDbTestCase;
 
 class PersonSerializerUpdateTest extends HumHubDbTestCase
@@ -10,7 +10,7 @@ class PersonSerializerUpdateTest extends HumHubDbTestCase
     public function testUpdateActivityWrapsDocument()
     {
         $actor = new LocalActor();
-        $actor->ap_id = 'https://test.fedihub.social/fediverse/actor/abc';
+        $actor->ap_id = 'https://test.fedihub.social/activitypub/actor/abc';
 
         $doc = ['id' => $actor->ap_id, 'type' => 'Person', 'name' => 'New Name'];
         $activity = (new PersonSerializer())->updateActivity($actor, $doc, $actor->ap_id . '#updates/xyz');
@@ -26,7 +26,7 @@ class PersonSerializerUpdateTest extends HumHubDbTestCase
     public function testSerializeIncludesSummaryAndIconWhenProvided()
     {
         $actor = new LocalActor();
-        $actor->ap_id = 'https://test.fedihub.social/fediverse/actor/abc';
+        $actor->ap_id = 'https://test.fedihub.social/activitypub/actor/abc';
         $actor->type = 'Person';
         $actor->preferred_username = 'abc';
         $actor->public_key = 'KEY';

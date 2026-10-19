@@ -1,8 +1,8 @@
 <?php
 
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\services\CommunityResolver;
+use humhub\modules\activitypub\services\CommunityResolver;
 use tests\codeception\_support\HumHubDbTestCase;
 
 class CommunityResolverTest extends HumHubDbTestCase

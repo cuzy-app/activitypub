@@ -1,9 +1,9 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
 use humhub\modules\content\widgets\richtext\RichText;
-use humhub\modules\fediverse\models\LocalActor;
+use humhub\modules\activitypub\models\LocalActor;
 use humhub\modules\user\models\User;
 
 /**

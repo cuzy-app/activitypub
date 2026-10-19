@@ -1,16 +1,16 @@
 <?php
 
-namespace humhub\modules\fediverse\controllers;
+namespace humhub\modules\activitypub\controllers;
 
 use humhub\components\Controller;
-use humhub\modules\fediverse\models\FederationFollow;
-use humhub\modules\fediverse\models\RemoteActor;
-use humhub\modules\fediverse\services\CommunityResolver;
-use humhub\modules\fediverse\services\CommunitySubscriptionService;
-use humhub\modules\fediverse\services\DiscoveryPolicy;
-use humhub\modules\fediverse\services\FederationUrl;
-use humhub\modules\fediverse\services\RemoteActorResolver;
-use humhub\modules\fediverse\services\UrlSafety;
+use humhub\modules\activitypub\models\FederationFollow;
+use humhub\modules\activitypub\models\RemoteActor;
+use humhub\modules\activitypub\services\CommunityResolver;
+use humhub\modules\activitypub\services\CommunitySubscriptionService;
+use humhub\modules\activitypub\services\DiscoveryPolicy;
+use humhub\modules\activitypub\services\FederationUrl;
+use humhub\modules\activitypub\services\RemoteActorResolver;
+use humhub\modules\activitypub\services\UrlSafety;
 use humhub\modules\user\models\User;
 use Yii;
 
@@ -35,7 +35,7 @@ class SettingsController extends Controller
     public function actionIndex()
     {
         $user = Yii::$app->user->getIdentity();
-        $settings = Yii::$app->getModule('fediverse')->settings->contentContainer($user);
+        $settings = Yii::$app->getModule('activitypub')->settings->contentContainer($user);
 
         $follows = FederationFollow::find()
             ->where([
@@ -61,7 +61,7 @@ class SettingsController extends Controller
     {
         $this->forcePostRequest();
         $user = Yii::$app->user->getIdentity();
-        $settings = Yii::$app->getModule('fediverse')->settings->contentContainer($user);
+        $settings = Yii::$app->getModule('activitypub')->settings->contentContainer($user);
         $settings->set('federationEnabled', Yii::$app->request->post('federationEnabled') ? 1 : 0);
         $this->view->saved();
         return $this->redirect(['index']);
@@ -78,7 +78,7 @@ class SettingsController extends Controller
             $resolver = new RemoteActorResolver();
             $wf = CommunityResolver::webfingerUrl($handle);
             if ($wf === '' || !UrlSafety::isSafePublicUrl($wf)) {
-                throw new \RuntimeException(Yii::t('FediverseModule.base', 'Invalid handle: {handle}', ['handle' => $handle]));
+                throw new \RuntimeException(Yii::t('ActivitypubModule.base', 'Invalid handle: {handle}', ['handle' => $handle]));
             }
             $actorUrl = $resolver->webfingerActorUrl($wf);
             $doc = $resolver->fetchActorDocument($actorUrl);
@@ -89,7 +89,7 @@ class SettingsController extends Controller
             if (($doc['type'] ?? '') === 'Group') {
                 $space = (new CommunitySubscriptionService())
                     ->provisionOrJoin($user, $doc, (string) ($doc['id'] ?? $actorUrl), $handle);
-                $this->view->success(Yii::t('FediverseModule.base', 'Joined the community space “{name}”.', ['name' => $space->name]));
+                $this->view->success(Yii::t('ActivitypubModule.base', 'Joined the community space “{name}”.', ['name' => $space->name]));
                 return $this->redirect($space->getUrl());
             }
 
@@ -104,10 +104,10 @@ class SettingsController extends Controller
             $shadow = User::findOne($remote->user_id);
             if ($shadow !== null) {
                 $shadow->follow($user->id); // fires Follow::EVENT_FOLLOWING_CREATED → outbound Follow
-                $this->view->success(Yii::t('FediverseModule.base', 'Now following {handle}.', ['handle' => $remote->handle]));
+                $this->view->success(Yii::t('ActivitypubModule.base', 'Now following {handle}.', ['handle' => $remote->handle]));
             }
         } catch (\Throwable $e) {
-            $this->view->error(Yii::t('FediverseModule.base', 'Could not resolve that account: {msg}', ['msg' => $e->getMessage()]));
+            $this->view->error(Yii::t('ActivitypubModule.base', 'Could not resolve that account: {msg}', ['msg' => $e->getMessage()]));
         }
         return $this->redirect(['index']);
     }
@@ -121,7 +121,7 @@ class SettingsController extends Controller
             $shadow = User::findOne($remote->user_id);
             if ($shadow !== null) {
                 $shadow->unfollow($user->id); // fires followRemoved → outbound Undo{Follow}
-                $this->view->success(Yii::t('FediverseModule.base', 'Unfollowed {handle}.', ['handle' => $remote->handle]));
+                $this->view->success(Yii::t('ActivitypubModule.base', 'Unfollowed {handle}.', ['handle' => $remote->handle]));
             }
         }
         return $this->redirect(['index']);

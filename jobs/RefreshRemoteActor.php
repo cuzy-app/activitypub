@@ -1,9 +1,9 @@
 <?php
 
-namespace humhub\modules\fediverse\jobs;
+namespace humhub\modules\activitypub\jobs;
 
-use humhub\modules\fediverse\models\RemoteActor;
-use humhub\modules\fediverse\services\RemoteActorResolver;
+use humhub\modules\activitypub\models\RemoteActor;
+use humhub\modules\activitypub\services\RemoteActorResolver;
 use humhub\modules\queue\ActiveJob;
 
 /** Best-effort background refresh of a remote actor's cached data (profile + follower/following counts). */

@@ -1,6 +1,6 @@
 <?php
 
-namespace humhub\modules\fediverse;
+namespace humhub\modules\activitypub;
 
 use yii\helpers\Url;
 
@@ -11,6 +11,6 @@ class Module extends \humhub\components\Module
      */
     public function getConfigUrl()
     {
-        return Url::to(['/fediverse/admin/index']);
+        return Url::to(['/activitypub/admin/index']);
     }
 }

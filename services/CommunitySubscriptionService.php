@@ -1,10 +1,10 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
-use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\models\SpaceCommunity;
-use humhub\modules\fediverse\jobs\DeliverToInbox;
+use humhub\modules\activitypub\models\LocalActor;
+use humhub\modules\activitypub\models\SpaceCommunity;
+use humhub\modules\activitypub\jobs\DeliverToInbox;
 use humhub\modules\space\models\Space;
 use humhub\modules\user\models\User;
 use RuntimeException;
@@ -54,7 +54,7 @@ class CommunitySubscriptionService
             $space = $this->createPublicSpace($communityDoc, $ghost);
 
             // Enable this module on the Space (per-container).
-            $space->moduleManager->enable('fediverse');
+            $space->moduleManager->enable('activitypub');
 
             $coupling = new SpaceCommunity();
             $coupling->space_id = $space->id;

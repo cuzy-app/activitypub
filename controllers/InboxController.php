@@ -1,11 +1,11 @@
 <?php
 
-namespace humhub\modules\fediverse\controllers;
+namespace humhub\modules\activitypub\controllers;
 
 use humhub\components\Controller;
-use humhub\modules\fediverse\jobs\ProcessInboxActivity;
-use humhub\modules\fediverse\services\DiscoveryPolicy;
-use humhub\modules\fediverse\services\FederationUrl;
+use humhub\modules\activitypub\jobs\ProcessInboxActivity;
+use humhub\modules\activitypub\services\DiscoveryPolicy;
+use humhub\modules\activitypub\services\FederationUrl;
 use Yii;
 use yii\web\BadRequestHttpException;
 use yii\web\Response;
@@ -22,13 +22,13 @@ class InboxController extends Controller
         return parent::beforeAction($action);
     }
 
-    /** POST /fediverse/inbox (shared inbox) */
+    /** POST /activitypub/inbox (shared inbox) */
     public function actionShared()
     {
         return $this->accept(null);
     }
 
-    /** POST /fediverse/actor/<guid>/inbox (per-user inbox) */
+    /** POST /activitypub/actor/<guid>/inbox (per-user inbox) */
     public function actionUser($guid)
     {
         return $this->accept($guid);
@@ -45,7 +45,7 @@ class InboxController extends Controller
         // load). Generous — Mastodon backs off and retries on 429. Soft backstop
         // only: keyed on getUserIP() (depends on trusted-proxy config) and per
         // egress IP, so it is not a hard DoS control.
-        $rlKey = 'fediverse.inbox.rl.' . md5((string) Yii::$app->request->getUserIP()) . '.' . (int) floor(time() / 60);
+        $rlKey = 'activitypub.inbox.rl.' . md5((string) Yii::$app->request->getUserIP()) . '.' . (int) floor(time() / 60);
         $hits = (int) Yii::$app->cache->get($rlKey);
         if ($hits >= 300) {
             Yii::$app->response->statusCode = 429;

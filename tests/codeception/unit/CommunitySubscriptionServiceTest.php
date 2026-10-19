@@ -1,11 +1,11 @@
 <?php
 
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\models\SpaceCommunity;
-use humhub\modules\fediverse\services\CommunitySubscriptionService;
-use humhub\modules\fediverse\services\GhostUser;
+use humhub\modules\activitypub\models\LocalActor;
+use humhub\modules\activitypub\models\SpaceCommunity;
+use humhub\modules\activitypub\services\CommunitySubscriptionService;
+use humhub\modules\activitypub\services\GhostUser;
 use humhub\modules\space\models\Space;
 use humhub\modules\user\models\User;
 use tests\codeception\_support\HumHubDbTestCase;

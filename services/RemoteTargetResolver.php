@@ -1,11 +1,11 @@
 <?php
 
-namespace humhub\modules\fediverse\services;
+namespace humhub\modules\activitypub\services;
 
 use humhub\modules\comment\models\Comment;
 use humhub\modules\content\models\Content;
-use humhub\modules\fediverse\models\FederationObject;
-use humhub\modules\fediverse\models\RemoteActor;
+use humhub\modules\activitypub\models\FederationObject;
+use humhub\modules\activitypub\models\RemoteActor;
 
 /**
  * For a given Content id, resolves the original remote ActivityPub object id and

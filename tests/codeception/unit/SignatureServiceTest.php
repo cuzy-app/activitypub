@@ -1,9 +1,9 @@
 <?php
 
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\services\KeyManager;
-use humhub\modules\fediverse\services\SignatureService;
+use humhub\modules\activitypub\services\KeyManager;
+use humhub\modules\activitypub\services\SignatureService;
 use tests\codeception\_support\HumHubDbTestCase;
 
 class SignatureServiceTest extends HumHubDbTestCase
@@ -23,7 +23,7 @@ class SignatureServiceTest extends HumHubDbTestCase
         $svc = new SignatureService();
 
         $method = 'POST';
-        $path = '/fediverse/inbox';
+        $path = '/activitypub/inbox';
         $body = '{"type":"Follow"}';
         $headers = [
             'host' => 'fedihub.social',
@@ -33,7 +33,7 @@ class SignatureServiceTest extends HumHubDbTestCase
         $headerList = ['(request-target)', 'host', 'date', 'digest'];
 
         $signingString = $svc->buildSigningString($method, $path, $headers, $headerList);
-        $this->assertStringContainsString('(request-target): post /fediverse/inbox', $signingString);
+        $this->assertStringContainsString('(request-target): post /activitypub/inbox', $signingString);
 
         $sigB64 = $svc->signString($signingString, $priv);
         $this->assertNotSame('', $sigB64);
@@ -59,25 +59,25 @@ class SignatureServiceTest extends HumHubDbTestCase
 
         // Proxy rewrote only the Host header: same path twice collapses to two candidates,
         // the received one first, the canonical one second.
-        $candidates = $svc->signingStringCandidates('POST', ['/fediverse/inbox', '/fediverse/inbox'], ['humhub:8080', 'fedihub.social'], $headers, $headerList);
+        $candidates = $svc->signingStringCandidates('POST', ['/activitypub/inbox', '/activitypub/inbox'], ['humhub:8080', 'fedihub.social'], $headers, $headerList);
         $this->assertCount(2, $candidates);
         $this->assertStringContainsString("host: humhub:8080\n", $candidates[0]);
         $this->assertStringContainsString("host: fedihub.social\n", $candidates[1]);
-        $this->assertStringContainsString('(request-target): post /fediverse/inbox', $candidates[1]);
+        $this->assertStringContainsString('(request-target): post /activitypub/inbox', $candidates[1]);
 
         // Proxy also stripped a path prefix: all four combinations, received pair first.
-        $candidates = $svc->signingStringCandidates('POST', ['/fediverse/inbox', '/humhub/fediverse/inbox'], ['humhub:8080', 'fedihub.social'], $headers, $headerList);
+        $candidates = $svc->signingStringCandidates('POST', ['/activitypub/inbox', '/humhub/activitypub/inbox'], ['humhub:8080', 'fedihub.social'], $headers, $headerList);
         $this->assertCount(4, $candidates);
-        $this->assertStringContainsString("(request-target): post /fediverse/inbox\nhost: humhub:8080", $candidates[0]);
-        $this->assertStringContainsString("(request-target): post /humhub/fediverse/inbox\nhost: fedihub.social", $candidates[3]);
+        $this->assertStringContainsString("(request-target): post /activitypub/inbox\nhost: humhub:8080", $candidates[0]);
+        $this->assertStringContainsString("(request-target): post /humhub/activitypub/inbox\nhost: fedihub.social", $candidates[3]);
 
         // `host` not signed: the host candidates make no difference.
-        $candidates = $svc->signingStringCandidates('POST', ['/fediverse/inbox'], ['humhub:8080', 'fedihub.social'], $headers, ['(request-target)', 'date', 'digest']);
+        $candidates = $svc->signingStringCandidates('POST', ['/activitypub/inbox'], ['humhub:8080', 'fedihub.social'], $headers, ['(request-target)', 'date', 'digest']);
         $this->assertCount(1, $candidates);
 
         // Empty candidates (Host header missing, no canonical path) are skipped and
         // never produce an empty "host: " line — an empty host is never what was signed.
-        $candidates = $svc->signingStringCandidates('POST', ['/fediverse/inbox', ''], ['', 'fedihub.social'], $headers, $headerList);
+        $candidates = $svc->signingStringCandidates('POST', ['/activitypub/inbox', ''], ['', 'fedihub.social'], $headers, $headerList);
         $this->assertCount(1, $candidates);
         $this->assertStringContainsString("host: fedihub.social\n", $candidates[0]);
     }
@@ -90,7 +90,7 @@ class SignatureServiceTest extends HumHubDbTestCase
         $headerList = ['(request-target)', 'host', 'date', 'digest'];
 
         // What the remote signed: our public host and path.
-        $signed = $svc->buildSigningString('POST', '/fediverse/inbox', [
+        $signed = $svc->buildSigningString('POST', '/activitypub/inbox', [
             'host' => 'fedihub.social',
             'date' => 'Mon, 22 Jun 2026 17:00:00 GMT',
             'digest' => SignatureService::digest($body),
@@ -114,10 +114,10 @@ class SignatureServiceTest extends HumHubDbTestCase
         };
 
         // Received-only reconstruction fails; adding the canonical host recovers it.
-        $this->assertFalse($verifies($svc->signingStringCandidates('POST', ['/fediverse/inbox'], ['humhub:8080'], $received, $headerList)));
-        $this->assertTrue($verifies($svc->signingStringCandidates('POST', ['/fediverse/inbox'], ['humhub:8080', 'fedihub.social'], $received, $headerList)));
+        $this->assertFalse($verifies($svc->signingStringCandidates('POST', ['/activitypub/inbox'], ['humhub:8080'], $received, $headerList)));
+        $this->assertTrue($verifies($svc->signingStringCandidates('POST', ['/activitypub/inbox'], ['humhub:8080', 'fedihub.social'], $received, $headerList)));
         // A wrong canonical host does not help — the signature still binds to our real host.
-        $this->assertFalse($verifies($svc->signingStringCandidates('POST', ['/fediverse/inbox'], ['humhub:8080', 'other.example'], $received, $headerList)));
+        $this->assertFalse($verifies($svc->signingStringCandidates('POST', ['/activitypub/inbox'], ['humhub:8080', 'other.example'], $received, $headerList)));
     }
 
     public function testMissingSignedHeaders()

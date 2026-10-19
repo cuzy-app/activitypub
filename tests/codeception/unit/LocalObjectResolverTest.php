@@ -1,8 +1,8 @@
 <?php
-namespace tests\codeception\unit\modules\fediverse;
+namespace tests\codeception\unit\modules\activitypub;
 
-use humhub\modules\fediverse\models\FederationObject;
-use humhub\modules\fediverse\services\LocalObjectResolver;
+use humhub\modules\activitypub\models\FederationObject;
+use humhub\modules\activitypub\services\LocalObjectResolver;
 use tests\codeception\_support\HumHubDbTestCase;
 
 class LocalObjectResolverTest extends HumHubDbTestCase

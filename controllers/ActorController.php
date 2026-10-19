@@ -1,14 +1,14 @@
 <?php
 
-namespace humhub\modules\fediverse\controllers;
+namespace humhub\modules\activitypub\controllers;
 
 use humhub\components\Controller;
-use humhub\modules\fediverse\models\FederationFollow;
-use humhub\modules\fediverse\models\LocalActor;
-use humhub\modules\fediverse\models\SpaceCommunity;
-use humhub\modules\fediverse\services\DiscoveryPolicy;
-use humhub\modules\fediverse\services\KeyManager;
-use humhub\modules\fediverse\services\PersonSerializer;
+use humhub\modules\activitypub\models\FederationFollow;
+use humhub\modules\activitypub\models\LocalActor;
+use humhub\modules\activitypub\models\SpaceCommunity;
+use humhub\modules\activitypub\services\DiscoveryPolicy;
+use humhub\modules\activitypub\services\KeyManager;
+use humhub\modules\activitypub\services\PersonSerializer;
 use humhub\modules\space\models\Space;
 use humhub\modules\user\models\User;
 use Yii;
@@ -27,7 +27,7 @@ class ActorController extends Controller
         return parent::beforeAction($action);
     }
 
-    /** GET /fediverse/actor/<guid> */
+    /** GET /activitypub/actor/<guid> */
     public function actionIndex($guid)
     {
         $user = User::findOne(['guid' => $guid]);
@@ -42,7 +42,7 @@ class ActorController extends Controller
         return $this->asActivityJson($doc);
     }
 
-    /** GET /fediverse/actor/space/<guid> — the Group actor for a federated Space. */
+    /** GET /activitypub/actor/space/<guid> — the Group actor for a federated Space. */
     public function actionSpace($guid)
     {
         if (!DiscoveryPolicy::isGloballyEnabled()) {
@@ -68,25 +68,25 @@ class ActorController extends Controller
         return $this->asActivityJson($doc);
     }
 
-    /** GET /fediverse/instance-actor */
+    /** GET /activitypub/instance-actor */
     public function actionInstance()
     {
         if (!DiscoveryPolicy::isGloballyEnabled()) {
             throw new NotFoundHttpException();
         }
         $actor = (new KeyManager())->getOrCreateInstanceActor();
-        $doc = (new PersonSerializer())->serialize($actor, $actor->preferred_username, \humhub\modules\fediverse\services\FederationUrl::base());
+        $doc = (new PersonSerializer())->serialize($actor, $actor->preferred_username, \humhub\modules\activitypub\services\FederationUrl::base());
 
         return $this->asActivityJson($doc);
     }
 
-    /** GET /fediverse/actor/<guid>/following */
+    /** GET /activitypub/actor/<guid>/following */
     public function actionFollowing($guid)
     {
         return $this->followCollection($guid, 'following', FederationFollow::DIRECTION_OUTBOUND);
     }
 
-    /** GET /fediverse/actor/<guid>/followers */
+    /** GET /activitypub/actor/<guid>/followers */
     public function actionFollowers($guid)
     {
         return $this->followCollection($guid, 'followers', FederationFollow::DIRECTION_INBOUND);

@@ -76,4 +76,4 @@ https://github.com/cuzy-app/activitypub
 
 ## Licence
 
-[GNU AGPL](https://github.com/cuzy-app/activitypub/blob/develop/docs/LICENCE.md)
+[GNU AGPL](https://github.com/cuzy-app/activitypub/blob/main/docs/LICENCE.md)

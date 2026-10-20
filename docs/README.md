@@ -73,3 +73,7 @@ https://github.com/cuzy-app/activitypub
 ## Publisher
 
 [CUZY.APP](https://www.cuzy.app/)
+
+## Licence
+
+[GNU AGPL](https://github.com/cuzy-app/clean-theme/blob/master/docs/LICENCE.md)

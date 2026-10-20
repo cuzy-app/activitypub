@@ -3,6 +3,7 @@
 namespace humhub\modules\activitypub\services;
 
 use Yii;
+use yii\helpers\Inflector;
 use yii\helpers\Url;
 
 /**
@@ -18,6 +19,8 @@ class FederationUrl
     {
         // Cut at '@' so an email-like username keeps only the local part.
         $local = explode('@', $username)[0];
+        // Transliterate first so accented letters survive (ü → u) instead of being dropped.
+        $local = Inflector::transliterate($local);
         // Replace any run of non [A-Za-z0-9_] with a single underscore, trim, lowercase.
         $handle = preg_replace('/[^A-Za-z0-9_]+/', '_', $local);
         $handle = trim((string) $handle, '_');

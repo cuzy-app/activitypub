@@ -34,7 +34,9 @@ class GhostUser
 
         $user = new User();
         $user->username = self::uniqueUsername('Fediverse');
-        $user->email = 'activitypub-system@' . FederationUrl::domain();
+        $domain = FederationUrl::domain();
+        // A dot-less host (e.g. localhost, an intranet name) would fail email validation.
+        $user->email = 'activitypub-system@' . (str_contains($domain, '.') ? $domain : $domain . '.invalid');
         $user->status = User::STATUS_ENABLED;
         $user->visibility = User::VISIBILITY_HIDDEN; // off the People directory
         $user->allowAssignDefaultGroup(false);

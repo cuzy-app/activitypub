@@ -96,7 +96,10 @@ class CommunitySubscriptionService
         $space->visibility = Space::VISIBILITY_ALL;       // public / guest-visible (§5 invariant)
         $space->join_policy = Space::JOIN_POLICY_FREE;
         $space->created_by = $ghost->id;                  // ownership seed (queue/console has no identity)
-        if (!$space->save()) {
+        // The Space is created on behalf of the system, not the subscriber: skip the
+        // visibility rule, which checks the current user's (admin-only by default)
+        // CreatePublicSpace permission, but keep all other validation.
+        if (!$space->validate(array_diff($space->activeAttributes(), ['visibility'])) || !$space->save(false)) {
             throw new RuntimeException('Could not create community Space: ' . implode(', ', $space->getErrorSummary(true)));
         }
         // Ensure the ghost is the owner regardless of who triggered creation.

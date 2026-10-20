@@ -12,6 +12,7 @@ class DiscoveryPolicyTest extends HumHubDbTestCase
     public function testRequiresGlobalSwitchAndGuestVisibleProfile()
     {
         $module = Yii::$app->getModule('activitypub');
+        $this->allowGuestAccess();
 
         $user = new User();
         $user->visibility = User::VISIBILITY_ALL;

@@ -185,3 +185,15 @@
 - Enh: Module unit tests can be run standalone against a HumHub checkout
   (`HUMHUB_PATH=/path/to/humhub codecept run unit -c tests`): the test bootstrap
   now loads the core test harness and the required `tests/config/*.php` exist.
+- Fix: Subscribing to a Lemmy community no longer fails for regular users with
+  "You cannot create public visible spaces!" — the community Space is created on
+  behalf of the system, so the subscriber's (admin-only by default)
+  `CreatePublicSpace` permission is not checked.
+- Fix: Accented letters in usernames are transliterated in the federated handle
+  (`jürgen` → `jurgen`) instead of being dropped (`j_rgen`).
+- Fix: The community ghost user can be created on installs with a dot-less host
+  name (e.g. `localhost`, an intranet name), whose synthetic email previously
+  failed validation.
+- Enh: Module unit tests are isolated — the module tables are emptied before
+  each test and the suite uses the core's default fixture cleanup, so rows no
+  longer leak between tests and runs.

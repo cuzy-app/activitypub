@@ -3,8 +3,9 @@
 Endpoints, data flows, the activity support matrix, known gaps and the roadmap of this
 module. State as of October 2026 (version 0.1.0, unreleased); verify against the code
 before relying on details. Protocol background (what Mastodon and Lemmy expect, HTTP
-Signatures, FEPs) lives in the [`activitypub-engineering`](https://github.com/cuzy-app/activitypub-engineering-skills) skill, HumHub module conventions
-in the `humhub-engineering` skill.
+Signatures, FEPs) and HumHub module conventions live in the
+[`activitypub-engineering`](https://github.com/cuzy-app/activitypub-engineering-skills)
+skill.
 
 ## Endpoints (`config.php` URL rules — order matters)
 

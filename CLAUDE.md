@@ -15,17 +15,18 @@ to Mastodon-compatible accounts, and Lemmy-family communities can be subscribed 
 
 ## Skills and documents
 
-This file holds only what is specific to this module. General knowledge comes from two
-companion skills, installed in the agent's skills directory (each repository has
-`scripts/install_skill.py --client <claude|codex|cursor|gemini|agents>`):
+This file holds only what is specific to this module. General knowledge comes from the
+**`activitypub-engineering`** skill
+([activitypub-engineering-skills](https://github.com/cuzy-app/activitypub-engineering-skills)),
+installed in the agent's skills directory with
+`scripts/install_skill.py --client <claude|codex|cursor|gemini|agents>`. It covers both:
 
-- **`activitypub-engineering`** ([activitypub-engineering-skills](https://github.com/cuzy-app/activitypub-engineering-skills)): the protocol — document
-  shapes, signatures, WebFinger, NodeInfo, delivery, Mastodon and Lemmy interop, FEPs. Use it
-  for any change to what goes over the wire. Its `scripts/validate_activitypub.py` checks
-  JSON fixtures of the documents this module emits.
-- **`humhub-engineering`** (`humhub-engineering-skills`): HumHub and Yii2 module
-  conventions — `config.php` events, migrations, queue jobs, permissions, tests, coding
-  standards. Its `scripts/validate_module.py .` checks this module's structure.
+- **the protocol** — document shapes, signatures, WebFinger, NodeInfo, delivery, Mastodon
+  and Lemmy interop, FEPs. Use it for any change to what goes over the wire. Its
+  `scripts/validate_activitypub.py` checks JSON fixtures of the documents this module emits;
+- **HumHub and Yii2 module conventions** (its `humhub-*` references) — `config.php` events,
+  migrations, queue jobs, permissions, tests, coding standards. Its
+  `scripts/validate_module.py .` checks this module's structure.
 
 Module-specific detail lives in **`docs/DEVELOPER.md`**: every endpoint, the inbound and
 outbound flows step by step, the activity support matrix, known gaps and bugs (fix them when

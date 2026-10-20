@@ -1,28 +1,3 @@
-
-Skip to main text
-Free Software Supporter:
-JOIN THE FSF
-
- [A GNU head] GNU Operating System
-Supported by the Free Software Foundation
- [Search www.gnu.org] 
- [Other languages] 
-
-    ABOUT GNU PHILOSOPHY LICENSES EDUCATION SOFTWARE DISTROS DOCS MALWARE HELP GNU AUDIO & VIDEO GNU ART FUN GNU'S WHO? SOFTWARE DIRECTORY HARDWARE SITEMAP 
-
-GNU Affero General Public License
-[AGPLv3 Logo]
-
-Skip to license text
-
-    Why the Affero GPL
-    Frequently Asked Questions
-    How to use GNU licenses for your own software
-    Translations of the GNU AGPL
-    The GNU AGPL in other formats: plain text, Docbook, LaTeX, standalone HTML, Texinfo, Markdown, ODF, RTF
-    GNU AGPL logos to use with your project
-    What to do if you see a possible GNU AGPL violation
-
 GNU AFFERO GENERAL PUBLIC LICENSE
 
 Version 3, 19 November 2007
